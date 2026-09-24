@@ -2,6 +2,12 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.1.2 (2026-09-24)
+
+### Fixed
+
+- Cross-IDE password prompts: connecting now uses the password carried by the shared connections file first, instead of always asking SecretStorage (which is per-IDE). SecretStorage remains the fallback, and prompting is the last resort.
+
 ## 0.1.1 (2026-09-24)
 
 ### Fixed

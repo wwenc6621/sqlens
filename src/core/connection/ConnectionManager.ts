@@ -292,11 +292,20 @@ export class ConnectionManager {
     return id;
   }
 
+  /**
+   * Fill in the passwords needed to connect.
+   *
+   * Resolution order per secret:
+   * 1. the value already carried by the config (e.g. from the shared
+   *    connections file, which works across IDEs),
+   * 2. this IDE's SecretStorage,
+   * 3. prompt the user (and remember the answer in SecretStorage).
+   */
   private async resolvePasswords(config: ConnectionConfig): Promise<ConnectionConfig> {
     const resolved = { ...config, ssh: { ...config.ssh } };
 
     if (resolved.type !== DatabaseType.SQLite) {
-      let pwd = await this.context.secrets.get(`sqlens.pwd.${resolved.id}`);
+      let pwd = resolved.password || await this.context.secrets.get(`sqlens.pwd.${resolved.id}`);
       if (!pwd || pwd === '<ask>') {
         pwd = await vscode.window.showInputBox({
           prompt: `Enter password for connection ${resolved.name || resolved.host}`,
@@ -313,7 +322,7 @@ export class ConnectionManager {
 
     if (resolved.ssh.enabled) {
       if (resolved.ssh.authMethod === 'password') {
-        let sshPwd = await this.context.secrets.get(`sqlens.ssh.pwd.${resolved.id}`);
+        let sshPwd = resolved.ssh.password || await this.context.secrets.get(`sqlens.ssh.pwd.${resolved.id}`);
         if (!sshPwd || sshPwd === '<ask>') {
           sshPwd = await vscode.window.showInputBox({
             prompt: `Enter SSH password for connection ${resolved.name || resolved.host}`,
