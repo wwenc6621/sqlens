@@ -108,39 +108,22 @@ function withSecrets(config: ConnectionConfig, transform: (value: string) => str
   return next;
 }
 
-/** True when any secret on the config is stored as legacy plaintext. */
-function hasPlaintextSecrets(config: ConnectionConfig): boolean {
-  const isPlain = (v?: string) => !!v && v !== '<ask>' && !v.startsWith(ENC_PREFIX);
-  return isPlain(config.password) || isPlain(config.ssh.password) || isPlain(config.ssh.passphrase);
-}
-
 export function sharedConnectionsFileExists(): boolean {
   return fs.existsSync(getSharedConnectionsFilePath());
 }
 
 export function loadSharedConnections(): ConnectionConfig[] {
   const file = getSharedConnectionsFilePath();
-  let loaded: ConnectionConfig[] = [];
   try {
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<SharedConnectionsFile>;
     if (parsed && Array.isArray(parsed.connections)) {
-      loaded = parsed.connections;
+      return parsed.connections.map(c => withSecrets(c, decryptSecret));
     }
   } catch {
     // Missing or unreadable file: start empty. A corrupt file is not silently
     // overwritten here — the next save() replaces it wholesale.
-    return [];
   }
-
-  // Decrypt secrets for use, and migrate legacy plaintext / malformed
-  // encrypted values in place.
-  const decrypted = loaded.map(c => withSecrets(c, decryptSecret));
-  const needsUpgrade = loaded.some(hasPlaintextSecrets)
-    || JSON.stringify(loaded).includes(`${ENC_PREFIX}:`);
-  if (needsUpgrade) {
-    saveSharedConnections(decrypted);
-  }
-  return decrypted;
+  return [];
 }
 
 export function saveSharedConnections(connections: ConnectionConfig[]): void {

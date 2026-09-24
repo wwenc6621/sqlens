@@ -13,8 +13,7 @@ import { ConnectionConfig } from '../../core/types';
  *
  * Keeping them outside any IDE's private storage means VS Code and VS Code
  * forks (Trae, ...) share the same saved queries, just like the shared
- * connections file. Legacy files from the old per-IDE globalStorage location
- * are copied over on first access (never overwritten, never deleted).
+ * connections file.
  */
 const QUERIES_DIR = 'saved-queries';
 
@@ -26,39 +25,8 @@ function sharedQueriesDir(): string {
   return path.join(os.homedir(), '.config', 'sqlens', QUERIES_DIR);
 }
 
-let legacyMigrated = false;
-
-/** Copy any saved queries from the legacy per-IDE location into the shared dir. */
-async function migrateLegacyQueries(context: vscode.ExtensionContext, sharedRoot: vscode.Uri): Promise<void> {
-  if (legacyMigrated) { return; }
-  legacyMigrated = true;
-  const legacyRoot = vscode.Uri.joinPath(context.globalStorageUri, QUERIES_DIR);
-  try {
-    const entries = await vscode.workspace.fs.readDirectory(legacyRoot);
-    if (entries.length === 0) { return; }
-    await vscode.workspace.fs.createDirectory(sharedRoot);
-    for (const [name] of entries) {
-      const dest = vscode.Uri.joinPath(sharedRoot, name);
-      if (!(await fileExists(dest))) {
-        await vscode.workspace.fs.copy(vscode.Uri.joinPath(legacyRoot, name), dest, { overwrite: false });
-      }
-    }
-    // Park the legacy directory so deleted queries do not resurrect on the
-    // next session.
-    await vscode.workspace.fs.rename(
-      legacyRoot,
-      vscode.Uri.file(`${legacyRoot.path}.migrated`),
-      { overwrite: true },
-    );
-  } catch {
-    // No legacy directory (fresh install): nothing to migrate.
-  }
-}
-
-export function savedQueriesRoot(context: vscode.ExtensionContext): vscode.Uri {
-  const sharedRoot = vscode.Uri.file(sharedQueriesDir());
-  void migrateLegacyQueries(context, sharedRoot);
-  return sharedRoot;
+export function savedQueriesRoot(_context: vscode.ExtensionContext): vscode.Uri {
+  return vscode.Uri.file(sharedQueriesDir());
 }
 
 export function connectionQueriesDir(context: vscode.ExtensionContext, connectionId: string): vscode.Uri {

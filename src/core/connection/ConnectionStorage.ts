@@ -2,10 +2,8 @@ import * as vscode from 'vscode';
 import { ConnectionConfig } from '../types';
 import { ProjectConnectionStorage } from './ProjectConnectionStorage';
 import {
-  getSharedConnectionsFilePath,
   loadSharedConnections,
   saveSharedConnections,
-  sharedConnectionsFileExists,
 } from './SharedConnectionFile';
 
 const CONNECTIONS_KEY = 'sqlens.connections';
@@ -35,22 +33,9 @@ export class ConnectionStorage {
     return vscode.workspace.getConfiguration('sqlens').get<boolean>('sharedConnections.storePasswords', true);
   }
 
-  /**
-   * One-time migration: when the shared backend is on but the file does not
-   * exist yet, seed it from the legacy globalState connections (including
-   * their passwords from SecretStorage).
-   */
-  private ensureSharedFile(): void {
-    if (sharedConnectionsFileExists()) { return; }
-    const legacy = this.context.globalState.get<ConnectionConfig[]>(CONNECTIONS_KEY, []);
-    const withPasswords = legacy.map(conn => ({ ...conn }));
-    saveSharedConnections(withPasswords);
-  }
-
   /** Read the global connection list from the active backend. */
   private readGlobalConnections(): ConnectionConfig[] {
     if (this.sharedEnabled()) {
-      this.ensureSharedFile();
       return loadSharedConnections();
     }
     return this.context.globalState.get<ConnectionConfig[]>(CONNECTIONS_KEY, []);

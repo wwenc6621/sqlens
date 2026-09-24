@@ -10,7 +10,7 @@ All notable changes to Sqlens are documented here.
 
 ### Security
 
-- Secrets in the shared connections file are now stored AES-256-GCM encrypted (`enc:v1:...`) instead of plaintext. The 256-bit key lives in `<config dir>/.key` (0600). Existing plaintext passwords are migrated to encrypted form automatically on first read.
+- Secrets in the shared connections file are stored AES-256-GCM encrypted (`enc:v1:...`) instead of plaintext. The 256-bit key lives in `<config dir>/.key` (0600).
 
 ## 0.1.1 (2026-09-24)
 
