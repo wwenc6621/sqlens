@@ -891,7 +891,7 @@
     "compile:tests": "tsc -p tsconfig.json",
     "test": "npm run compile:tests && node ./dist/test/runTest.js",
     "package": "vsce package",
-    "final": "vsce package -o sqlens.vsix",
+    "final": "vsce package -o sqlens-vscode.vsix",
     "publish": "vsce publish"
   },
   "dependencies": {
