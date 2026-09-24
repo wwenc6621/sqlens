@@ -1,0 +1,340 @@
+.quickview-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--vscode-sideBar-background, #1e1e1e);
+  color: var(--vscode-sideBar-foreground, #cccccc);
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  box-sizing: border-box;
+}
+
+.quickview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--vscode-panel-border, #3c3c3c);
+}
+
+.quickview-header h2 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--vscode-foreground, #ffffff);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quickview-copy-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.qv-copy-btn {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.qv-copy-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.quickview-search {
+  padding: 6px 10px;
+  flex-shrink: 0;
+}
+
+.quickview-search input {
+  width: 100%;
+  padding: 5px 10px;
+  background-color: var(--vscode-input-background, #252526);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  border-radius: 3px;
+  font-size: 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.quickview-search input:focus {
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.quickview-content {
+  flex: 1;
+  overflow-y: auto;
+  background-color: var(--vscode-editor-background, #1e1e1e);
+  min-height: 0;
+}
+
+.quickview-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground, #858585);
+  font-style: italic;
+  font-size: 12px;
+}
+
+.quickview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+  table-layout: fixed;
+}
+
+.quickview-table th {
+  position: sticky;
+  top: 0;
+  background-color: var(--vscode-editorGroupHeader-tabsBackground, #252526);
+  color: var(--vscode-foreground, #ffffff);
+  font-weight: 600;
+  font-size: 11px;
+  padding: 7px 10px;
+  border-bottom: 2px solid var(--vscode-panel-border, #3c3c3c);
+  z-index: 1;
+}
+
+.col-header { width: 30%; }
+.type-header { width: 22%; }
+.val-header { }
+.copy-header { width: 44px; text-align: center; }
+
+.quickview-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(255,255,255,0.05));
+  vertical-align: top;
+}
+
+.quickview-table tr:hover td {
+  background-color: var(--vscode-list-hoverBackground, rgba(255,255,255,0.03));
+}
+
+.pk-row td:first-child {
+  background-color: rgba(255, 165, 0, 0.04);
+}
+
+.col-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Scoped to the quick view: the data grid shares this stylesheet and uses the
+   same class names, so unscoped rules would leak into its header. */
+.quickview-panel .col-name {
+  font-weight: 600;
+  color: var(--vscode-symbolIcon-propertyForeground, #3797dd);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* Column comment shown under the field name. */
+.quickview-panel .col-comment {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--vscode-descriptionForeground);
+  overflow-wrap: anywhere;
+}
+
+.quickview-panel .quickview-modal-comment {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--vscode-descriptionForeground);
+  overflow-wrap: anywhere;
+}
+
+.col-type-badge {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #858585);
+  font-family: monospace;
+  background: rgba(255,255,255,0.06);
+  padding: 1px 4px;
+  border-radius: 2px;
+  display: inline-block;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.pk-badge {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.type-cell { }
+
+.val-cell {
+  min-width: 0;
+}
+
+.val-text {
+  font-family: var(--vscode-editor-font-family, Consolas, Monaco, monospace);
+  color: var(--vscode-editor-foreground, #d4d4d4);
+  font-size: 12px;
+  display: block;
+  width: 100%;
+  max-height: 96px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 2px 3px;
+  cursor: zoom-in;
+}
+
+.val-text:hover {
+  border-color: var(--vscode-focusBorder, #007acc);
+  background: rgba(255,255,255,0.04);
+}
+
+.val-null {
+  font-style: italic;
+  color: var(--vscode-descriptionForeground, rgba(128, 128, 128, 0.6));
+  font-size: 11px;
+}
+
+.copy-cell {
+  text-align: center;
+}
+
+.copy-btn {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--vscode-descriptionForeground, #858585);
+  border-radius: 3px;
+  width: 26px;
+  height: 22px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  transition: all 0.12s;
+}
+
+.copy-btn:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.copy-btn.copied {
+  background-color: rgba(137, 209, 133, 0.2);
+  color: #89d185;
+  border-color: transparent;
+}
+
+.quickview-toast {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 20;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.28);
+  background: var(--vscode-notifications-background, #252526);
+  color: var(--vscode-notifications-foreground, #cccccc);
+  border: 1px solid var(--vscode-notifications-border, #3c3c3c);
+}
+
+.quickview-toast.success { border-left: 3px solid #89d185; }
+.quickview-toast.error { border-left: 3px solid var(--vscode-errorForeground, #f48771); }
+
+.quickview-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0,0,0,0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.quickview-modal {
+  width: min(900px, 92vw);
+  height: min(620px, 82vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--vscode-editor-background, #1e1e1e);
+  color: var(--vscode-editor-foreground, #d4d4d4);
+  border: 1px solid var(--vscode-panel-border, #3c3c3c);
+  border-radius: 6px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+
+.quickview-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border, #3c3c3c);
+}
+
+.quickview-modal-header div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.quickview-modal-header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quickview-modal-header span {
+  color: var(--vscode-descriptionForeground, #858585);
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.quickview-modal-header button,
+.quickview-modal-actions button {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 3px 8px;
+}
+
+.quickview-modal-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  font-family: var(--vscode-editor-font-family, Consolas, Monaco, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.quickview-modal-actions {
+  padding: 8px 12px;
+  border-top: 1px solid var(--vscode-panel-border, #3c3c3c);
+  display: flex;
+  justify-content: flex-end;
+}

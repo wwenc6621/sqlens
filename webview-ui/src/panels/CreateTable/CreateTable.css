@@ -1,0 +1,252 @@
+.create-table-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family, system-ui, -apple-system, sans-serif);
+  overflow: auto;
+}
+
+.create-table-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+.create-table-content {
+  flex: 1;
+  overflow: visible;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.config-form {
+  background: var(--vscode-sideBar-background, rgba(0,0,0,0.05));
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+  border-radius: 4px;
+  padding: 16px;
+}
+
+.form-group-horizontal {
+  display: flex;
+  gap: 16px;
+}
+
+.table-options-row {
+  margin-top: 16px;
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.form-item.main-name {
+  flex: 2;
+}
+
+.form-item label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  font-weight: 500;
+}
+
+.form-input {
+  padding: 6px 10px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.form-input:focus {
+  border-color: var(--vscode-focusBorder);
+  outline: none;
+}
+
+.columns-section h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.definition-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.definition-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+  background: var(--vscode-sideBar-background, rgba(0,0,0,0.05));
+  border-radius: 4px;
+}
+
+.checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.create-columns-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+
+.create-columns-table th {
+  padding: 10px 12px;
+  background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.02));
+  font-weight: 600;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+}
+
+.create-columns-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.04));
+  vertical-align: middle;
+}
+
+.cell-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-size: 12px;
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.cell-input:focus {
+  border-color: var(--vscode-focusBorder);
+  outline: none;
+}
+
+.action-section {
+  display: flex;
+  margin-top: 10px;
+}
+
+.sql-preview-container {
+  background: var(--vscode-sideBar-background, rgba(0,0,0,0.05));
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+  border-radius: 4px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.sql-preview-container h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-notificationsWarningIcon-foreground, orange);
+}
+
+.sql-preview-textarea {
+  width: 100%;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  padding: 8px;
+  border-radius: 3px;
+  resize: vertical;
+  box-sizing: border-box;
+  line-height: 1.4;
+}
+
+.sql-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Autocomplete within table cells */
+.create-columns-table .autocomplete-container {
+  position: relative;
+  width: 100%;
+  z-index: 5;
+}
+
+.create-columns-table .autocomplete-container input {
+  font-family: var(--vscode-editor-font-family, monospace);
+  width: 100%;
+  padding: 5px 8px;
+}
+
+.table-wrapper {
+  position: relative;
+  overflow: visible;
+}
+
+.create-columns-table .autocomplete-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  background: var(--vscode-dropdown-background, #3c3c3c);
+  border: 1px solid var(--vscode-dropdown-border, #3c3c3c);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.35);
+}
+
+.create-columns-table .autocomplete-suggestions li {
+  padding: 6px 10px;
+  color: var(--vscode-dropdown-foreground, #cccccc);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.create-columns-table .autocomplete-suggestions li:hover {
+  background: var(--vscode-list-hoverBackground, #04395e);
+  color: var(--vscode-list-activeSelectionForeground, #ffffff);
+}

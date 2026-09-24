@@ -1,0 +1,274 @@
+.query-plan-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family, system-ui, -apple-system, sans-serif);
+  overflow: hidden;
+}
+
+.plan-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+}
+
+/* Header */
+.plan-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  flex-shrink: 0;
+}
+
+.plan-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-top: 2px;
+  display: block;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.tab-buttons button {
+  background: var(--vscode-button-secondaryBackground, rgba(255,255,255,0.1));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  border: none;
+  border-radius: 3px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tab-buttons button:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255,255,255,0.15));
+}
+
+.tab-buttons button.active {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+/* SQL Preview */
+.sql-preview {
+  padding: 12px 20px;
+  background: var(--vscode-editor-inactiveSelectionBackground, rgba(255,255,255,0.02));
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+.sql-preview h4 {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.sql-preview pre {
+  margin: 0;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 12px;
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 80px;
+}
+
+.sql-preview code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  color: var(--vscode-charts-yellow, #d7ba7d);
+}
+
+/* Body and Canvas */
+.plan-body {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.diagram-canvas {
+  flex: 1;
+  padding: 20px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.legend {
+  display: flex;
+  gap: 20px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.04));
+  padding-bottom: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-danger { background: var(--vscode-errorForeground, #f48771); }
+.dot-success { background: var(--vscode-gitDecoration-addedResourceForeground, #81b88b); }
+.dot-default { background: var(--vscode-descriptionForeground, #808080); }
+
+/* Tree Layout */
+.tree-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  flex: 1;
+}
+
+.plan-node-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.plan-card {
+  width: 260px;
+  background: var(--vscode-sideBar-background, #252526);
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  margin-bottom: 24px;
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+}
+
+/* Branch lines connecting parents to children */
+.plan-node-wrapper::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  height: 24px;
+  background: var(--vscode-widget-border, rgba(255, 255, 255, 0.15));
+  z-index: 1;
+}
+
+/* Remove branch line for leaf nodes */
+.plan-node-wrapper:last-child::after,
+.plan-node-wrapper:only-child::after,
+.plan-children:empty + .plan-node-wrapper::after {
+  display: none;
+}
+
+.plan-card.full-scan {
+  border-left: 4px solid var(--vscode-errorForeground, #f48771);
+}
+
+.plan-card.index-scan {
+  border-left: 4px solid var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
+}
+
+.node-type {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--vscode-foreground);
+  margin-bottom: 6px;
+}
+
+.node-relation {
+  font-size: 11px;
+  margin-bottom: 6px;
+  opacity: 0.8;
+}
+
+.node-detail {
+  font-size: 10px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  opacity: 0.7;
+  word-break: break-all;
+}
+
+.node-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.stat-badge {
+  background: var(--vscode-badge-background, rgba(255, 255, 255, 0.08));
+  color: var(--vscode-badge-foreground, var(--vscode-foreground));
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.plan-children {
+  display: flex;
+  gap: 20px;
+  position: relative;
+  padding-top: 12px;
+}
+
+/* Connect children horizontally */
+.plan-children::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 2px;
+  background: var(--vscode-widget-border, rgba(255, 255, 255, 0.15));
+}
+
+/* Vertical connections to children */
+.plan-children > .plan-node-wrapper::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  width: 2px;
+  height: 12px;
+  background: var(--vscode-widget-border, rgba(255, 255, 255, 0.15));
+}
+
+/* Raw Output Panel */
+.raw-output {
+  flex: 1;
+  padding: 20px;
+  background: var(--vscode-editor-background);
+  overflow: auto;
+}
+
+.raw-plan-text {
+  margin: 0;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--vscode-editor-foreground);
+}

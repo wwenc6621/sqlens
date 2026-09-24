@@ -1,0 +1,137 @@
+/* ── Connection Form ── */
+
+.connection-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  height: auto;
+  overflow: auto;
+}
+
+/* ── Header ── */
+
+.form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, rgba(255,255,255,0.1)));
+  background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+.form-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  margin: 0;
+}
+
+.form-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Tabs ── */
+
+.form-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 24px;
+  background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, rgba(255,255,255,0.1)));
+}
+
+.form-tabs .tab {
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vscode-descriptionForeground);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.form-tabs .tab:hover {
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.form-tabs .tab.active {
+  color: var(--vscode-foreground);
+  border-bottom-color: var(--vscode-focusBorder);
+}
+
+/* ── Content ── */
+
+.form-content {
+  flex: 1;
+  overflow: visible;
+  padding: 24px;
+}
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 600px;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-row > .form-field {
+  flex: 1;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-field input,
+.form-field select {
+  width: 100%;
+}
+
+.form-field input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.form-field input[type="number"]::-webkit-inner-spin-button,
+.form-field input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 500px) {
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-row > .form-field {
+    max-width: none !important;
+  }
+
+  .form-content {
+    padding: 16px;
+  }
+
+  .form-header {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .form-tabs {
+    padding: 0 16px;
+    overflow-x: auto;
+  }
+}

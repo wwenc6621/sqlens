@@ -1,0 +1,251 @@
+.aia-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.aia-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+}
+
+.aia-header h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--vscode-foreground);
+}
+
+.aia-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.aia-filter {
+  width: 140px;
+  padding: 3px 6px;
+  font-size: 11px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 3px;
+  outline: none;
+}
+
+.aia-filter:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.aia-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  border-radius: 3px;
+}
+
+.aia-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.aia-pending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+  background: var(--vscode-editorWarning-background, rgba(204, 153, 0, 0.06));
+}
+
+.aia-pending {
+  border: 1px solid var(--vscode-editorWarning-foreground, #cc9900);
+  border-radius: 4px;
+  padding: 8px;
+  background: var(--vscode-editor-background);
+}
+
+.aia-pending-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vscode-editorWarning-foreground, #cc9900);
+  flex-wrap: wrap;
+}
+
+.aia-pending-title {
+  font-weight: 600;
+}
+
+.aia-pending-meta {
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.aia-pending-sql,
+.aia-sql {
+  margin: 6px 0;
+  padding: 6px 8px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: var(--vscode-textCodeBlock-background);
+  border-radius: 3px;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.aia-pending-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.aia-btn.allow {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.aia-btn.allow:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.aia-btn.deny {
+  background: transparent;
+  color: var(--vscode-errorForeground, #f66);
+  border: 1px solid var(--vscode-errorForeground, #f66);
+}
+
+.aia-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.aia-entry {
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.12));
+}
+
+.aia-entry-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 5px 12px;
+  font-size: 11px;
+  text-align: left;
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: none;
+  cursor: pointer;
+}
+
+.aia-entry-main:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.aia-entry.expanded {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.aia-status {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.aia-status.ok { color: var(--vscode-charts-green, #4caf50); }
+.aia-status.error { color: var(--vscode-errorForeground, #f66); }
+.aia-status.blocked { color: var(--vscode-charts-orange, #e5a35a); }
+
+.aia-time {
+  color: var(--vscode-descriptionForeground);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.aia-client {
+  font-weight: 600;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.aia-tool {
+  font-family: var(--vscode-editor-font-family, monospace);
+  color: var(--vscode-charts-blue, #75beff);
+  flex-shrink: 0;
+}
+
+.aia-rows {
+  color: var(--vscode-descriptionForeground);
+  flex-shrink: 0;
+}
+
+.aia-duration {
+  margin-left: auto;
+  color: var(--vscode-descriptionForeground);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.aia-entry-detail {
+  padding: 0 12px 8px 32px;
+}
+
+.aia-conn {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 2px;
+}
+
+.aia-err {
+  font-size: 11px;
+  color: var(--vscode-errorForeground, #f66);
+  margin-bottom: 4px;
+}
+
+.aia-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+}
+
+.aia-empty p {
+  margin: 0;
+}
+
+.aia-empty-hint {
+  font-size: 11px;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+.aia-footer {
+  padding: 4px 12px;
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.12));
+}
+
+.aia-footer-hint {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+}

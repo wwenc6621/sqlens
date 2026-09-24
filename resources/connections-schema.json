@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Sqlens Connections Configuration",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "number", "minimum": 1 },
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "id": { "type": "string", "description": "Unique connection ID (optional, auto-generated if omitted)" },
+          "name": { "type": "string", "description": "Display name of the connection" },
+          "type": { "type": "string", "enum": ["mysql", "postgresql", "sqlite", "redis", "mongodb", "mssql", "mariadb"] },
+          "host": { "type": "string", "description": "Database server host address" },
+          "port": { "type": "number", "description": "Port number" },
+          "username": { "type": "string", "description": "Database user name" },
+          "password": { "type": "string", "description": "Password or '<ask>' to prompt on connection" },
+          "database": { "type": "string", "description": "Database name" },
+          "filepath": { "type": "string", "description": "File path for SQLite databases" },
+          "group": { "type": "string", "description": "Grouping label for sidebar list" },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "color": { "type": "string", "description": "Optional label color hex/name" },
+          "ssl": {
+            "type": "object",
+            "properties": {
+              "mode": { "type": "string", "enum": ["disabled", "preferred", "required", "verify-ca", "verify-full"] }
+            }
+          },
+          "ssh": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "host": { "type": "string" },
+              "port": { "type": "number" },
+              "username": { "type": "string" },
+              "authMethod": { "type": "string", "enum": ["password", "privateKey", "agent"] },
+              "password": { "type": "string" },
+              "privateKeyPath": { "type": "string" },
+              "passphrase": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

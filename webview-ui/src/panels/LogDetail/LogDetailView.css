@@ -1,0 +1,108 @@
+/* Read-only log entry detail, shown as a tab inside the Sqlens panel. */
+
+.log-entry-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family, system-ui, -apple-system, sans-serif);
+}
+
+.log-entry-empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.log-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+.log-entry-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.log-entry-type {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: var(--vscode-badge-foreground);
+  background: var(--vscode-badge-background);
+}
+
+.log-entry-type.error {
+  color: var(--vscode-editor-background);
+  background: var(--vscode-errorForeground, #f48771);
+}
+
+.log-entry-type.sql {
+  color: var(--vscode-editor-background);
+  background: var(--vscode-charts-blue, #007acc);
+}
+
+.log-entry-stamp {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+}
+
+.log-entry-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+}
+
+.log-entry-action:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.log-entry-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.log-entry-message,
+.log-entry-details {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: var(--vscode-editor-font-family, 'SF Mono', monospace);
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  border-radius: 4px;
+  background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.04));
+}
+
+.log-entry-details {
+  color: var(--vscode-descriptionForeground);
+  border-left: 3px solid var(--vscode-errorForeground, #f48771);
+}

@@ -1,0 +1,924 @@
+{
+  "name": "sqlens",
+  "displayName": "Sqlens - Database Client & MCP",
+  "description": "A fast, feature-rich database client for VSCode with built-in MCP server. Connect to MySQL, PostgreSQL, SQLite and more. Search: database, db, client, sql, mcp.",
+  "version": "0.1.0",
+  "publisher": "wwenc6621",
+  "author": {
+    "name": "wwenc6621",
+    "url": "https://marketplace.visualstudio.com/publishers/wwenc6621"
+  },
+  "icon": "media/logo.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wwenc6621/sqlens.git"
+  },
+  "homepage": "https://github.com/wwenc6621/sqlens#readme",
+  "bugs": {
+    "url": "https://github.com/wwenc6621/sqlens/issues"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other",
+    "Data Science",
+    "Visualization"
+  ],
+  "keywords": [
+    "database",
+    "db",
+    "client",
+    "sql",
+    "mcp",
+    "mysql",
+    "postgresql",
+    "sqlite",
+    "redis",
+    "mongodb",
+    "query",
+    "data"
+  ],
+  "activationEvents": [
+    "onLanguage:sql",
+    "onCustomEditor:sqlens.sqliteViewer",
+    "onStartupFinished",
+    "onView:sqlens.connections",
+    "onView:sqlens.savedQueries",
+    "onView:sqlens.schema",
+    "onCommand:sqlens.newSavedQuery",
+    "onCommand:sqlens.renameSavedQuery",
+    "onCommand:sqlens.deleteSavedQuery",
+    "onCommand:sqlens.refreshSavedQueries",
+    "onCommand:sqlens.refreshDatabases",
+    "onView:sqlens.queryResultsView",
+    "onCommand:sqlens.newConnection",
+    "onCommand:sqlens.newConnectionGroup",
+    "onCommand:sqlens.renameConnectionGroup",
+    "onCommand:sqlens.deleteConnectionGroup",
+    "onCommand:sqlens.moveConnectionToGroup",
+    "onCommand:sqlens.editConnection",
+    "onCommand:sqlens.deleteConnection",
+    "onCommand:sqlens.connect",
+    "onCommand:sqlens.selectConnection",
+    "onCommand:sqlens.disconnect",
+    "onCommand:sqlens.testConnection",
+    "onCommand:sqlens.newQuery",
+    "onCommand:sqlens.saveQuery",
+    "onCommand:sqlens.toggleQueryAutoSave",
+    "onCommand:sqlens.changeQueryContext",
+    "onCommand:sqlens.runQuery",
+    "onCommand:sqlens.runAllQueries",
+    "onCommand:sqlens.cancelQuery",
+    "onCommand:sqlens.formatSQL",
+    "onCommand:sqlens.queryHistory",
+    "onCommand:sqlens.openTable",
+    "onCommand:sqlens.openStructure",
+    "onCommand:sqlens.showDDL",
+    "onCommand:sqlens.copyCreateTable",
+    "onCommand:sqlens.renameTable",
+    "onCommand:sqlens.switchDatabase",
+    "onCommand:sqlens.refreshConnections",
+    "onCommand:sqlens.refreshSchema",
+    "onCommand:sqlens.runStatementAt",
+    "onCommand:sqlens.truncateTable",
+    "onCommand:sqlens.dropTable",
+    "onCommand:sqlens.quickSwitcher",
+    "onCommand:sqlens.erDiagram",
+    "onCommand:sqlens.exportData",
+    "onCommand:sqlens.importData",
+    "onCommand:sqlens.explainPlan",
+    "onCommand:sqlens.openTerminal",
+    "onCommand:sqlens.clearLogs",
+    "onCommand:sqlens.showLogsOutput",
+    "onCommand:sqlens.saveConnectionToProject",
+    "onCommand:sqlens.openProjectConfig",
+    "onCommand:sqlens.searchConnections",
+    "onCommand:sqlens.editDatabase",
+    "onCommand:sqlens.createDatabase",
+    "onCommand:sqlens.createTable",
+    "onCommand:sqlens.dumpDatabase",
+    "onCommand:sqlens.importDatabase",
+    "onCommand:sqlens.mcp.register",
+    "onCommand:sqlens.mcp.copyConfig",
+    "onCommand:sqlens.mcp.showActivity",
+    "onCommand:sqlens.mcp.clearActivity",
+    "onCommand:sqlens.mcp.copyEndpoint"
+  ],
+  "main": "./dist/extension.js",
+  "l10n": "./l10n",
+  "contributes": {
+    "jsonValidation": [
+      {
+        "fileMatch": ".sqlens.json",
+        "url": "./resources/connections-schema.json"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "sqlens.sqliteViewer",
+        "displayName": "%Sqlens SQLite Viewer%",
+        "selector": [
+          {
+            "filenamePattern": "*.db"
+          },
+          {
+            "filenamePattern": "*.sqlite"
+          },
+          {
+            "filenamePattern": "*.sqlite3"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "sqlens",
+          "title": "%Sqlens%",
+          "icon": "media/database.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "sqlens-panel",
+          "title": "%Sqlens%",
+          "icon": "media/database.svg"
+        }
+      ]
+    },
+    "views": {
+      "sqlens": [
+        {
+          "id": "sqlens.connections",
+          "name": "%Connections%"
+        },
+        {
+          "id": "sqlens.savedQueries",
+          "name": "%Saved SQL%"
+        },
+        {
+          "id": "sqlens.schema",
+          "name": "%Schema%"
+        }
+      ],
+      "sqlens-panel": [
+        {
+          "type": "webview",
+          "id": "sqlens.queryResultsView",
+          "name": "%Query Results%"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "sqlens.connections",
+        "contents": "%No connections yet.\n[Create Connection](command:sqlens.newConnection)%"
+      },
+      {
+        "view": "sqlens.savedQueries",
+        "contents": "%A saved query is stored with its connection, so it is already on disk — no Save As needed.\n[New Saved Query](command:sqlens.newSavedQuery)\n[Create Connection](command:sqlens.newConnection)%"
+      }
+    ],
+    "commands": [
+      {
+        "command": "sqlens.newConnection",
+        "title": "%New Connection%",
+        "category": "%Sqlens%",
+        "icon": "$(add)"
+      },
+      {
+        "command": "sqlens.newConnectionGroup",
+        "title": "%New Connection Folder%",
+        "category": "%Sqlens%",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "sqlens.renameConnectionGroup",
+        "title": "%Rename Folder%",
+        "category": "%Sqlens%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "sqlens.deleteConnectionGroup",
+        "title": "%Delete Folder%",
+        "category": "%Sqlens%",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "sqlens.moveConnectionToGroup",
+        "title": "%Move to Folder...%",
+        "category": "%Sqlens%",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "sqlens.newSavedQuery",
+        "title": "%New Saved Query%",
+        "category": "%Sqlens%",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "sqlens.renameSavedQuery",
+        "title": "%Rename Query%",
+        "category": "%Sqlens%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "sqlens.deleteSavedQuery",
+        "title": "%Delete Query%",
+        "category": "%Sqlens%",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "sqlens.refreshSavedQueries",
+        "title": "%Refresh Saved Queries%",
+        "category": "%Sqlens%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sqlens.refreshDatabases",
+        "title": "%Refresh Databases%",
+        "category": "%Sqlens%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sqlens.editConnection",
+        "title": "%Edit Connection%",
+        "category": "%Sqlens%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "sqlens.deleteConnection",
+        "title": "%Delete Connection%",
+        "category": "%Sqlens%",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "sqlens.connect",
+        "title": "%Connect%",
+        "category": "%Sqlens%",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "sqlens.selectConnection",
+        "title": "%Select Connection%",
+        "category": "%Sqlens%",
+        "icon": "$(database)"
+      },
+      {
+        "command": "sqlens.disconnect",
+        "title": "%Disconnect%",
+        "category": "%Sqlens%",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "sqlens.testConnection",
+        "title": "%Test Connection%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.newQuery",
+        "title": "%New Query%",
+        "category": "%Sqlens%",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "sqlens.saveQuery",
+        "title": "%Save Query%",
+        "category": "%Sqlens%",
+        "icon": "$(save)"
+      },
+      {
+        "command": "sqlens.toggleQueryAutoSave",
+        "title": "%Toggle Query Auto Save%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.changeQueryContext",
+        "title": "%Change Query Database Context%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.runQuery",
+        "title": "%Run Query%",
+        "category": "%Sqlens%",
+        "icon": "$(play)"
+      },
+      {
+        "command": "sqlens.runAllQueries",
+        "title": "%Run All Statements%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.cancelQuery",
+        "title": "%Cancel Query%",
+        "category": "%Sqlens%",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "sqlens.formatSQL",
+        "title": "%Format SQL%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.queryHistory",
+        "title": "%Query History%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.openTable",
+        "title": "%Open Table Data%",
+        "category": "%Sqlens%",
+        "icon": "$(table)"
+      },
+      {
+        "command": "sqlens.openStructure",
+        "title": "%Edit Table Structure%",
+        "category": "%Sqlens%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "sqlens.showDDL",
+        "title": "%Show DDL%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.copyCreateTable",
+        "title": "%Copy CREATE TABLE to Clipboard%",
+        "category": "%Sqlens%",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "sqlens.renameTable",
+        "title": "%Rename Table%",
+        "category": "%Sqlens%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "sqlens.switchDatabase",
+        "title": "%Switch Database%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.refreshConnections",
+        "title": "%Refresh%",
+        "category": "%Sqlens%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sqlens.refreshSchema",
+        "title": "%Refresh Schema%",
+        "category": "%Sqlens%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "sqlens.runStatementAt",
+        "title": "%Run Statement%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.truncateTable",
+        "title": "%Truncate Table%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.dropTable",
+        "title": "%Drop Table%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.quickSwitcher",
+        "title": "%Quick Table Switcher%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.erDiagram",
+        "title": "%Open ER Diagram%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.exportData",
+        "title": "%Export Table Data%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.importData",
+        "title": "%Import Data to Table%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.explainPlan",
+        "title": "%Explain Query Plan%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.openTerminal",
+        "title": "%Open Terminal CLI%",
+        "category": "%Sqlens%",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "sqlens.clearLogs",
+        "title": "%Clear Logs%",
+        "category": "%Sqlens%",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "sqlens.showLogsOutput",
+        "title": "%Show Log Output%",
+        "category": "%Sqlens%",
+        "icon": "$(output)"
+      },
+      {
+        "command": "sqlens.saveConnectionToProject",
+        "title": "%Save Connection to Project Configuration%",
+        "category": "%Sqlens%",
+        "icon": "$(save)"
+      },
+      {
+        "command": "sqlens.openProjectConfig",
+        "title": "%Open Project Database Configuration File%",
+        "category": "%Sqlens%",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "sqlens.searchConnections",
+        "title": "%Search Database Connections%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.editDatabase",
+        "title": "%Edit Database%",
+        "category": "%Sqlens%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "sqlens.createDatabase",
+        "title": "%Create Database%",
+        "category": "%Sqlens%",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "sqlens.createTable",
+        "title": "%Create New Table%",
+        "category": "%Sqlens%",
+        "icon": "$(add)"
+      },
+      {
+        "command": "sqlens.dumpDatabase",
+        "title": "%Dump Database (Export SQL)...%",
+        "category": "%Sqlens%",
+        "icon": "$(export)"
+      },
+      {
+        "command": "sqlens.importDatabase",
+        "title": "%Import Database (SQL File)...%",
+        "category": "%Sqlens%",
+        "icon": "$(import)"
+      },
+      {
+        "command": "sqlens.mcp.register",
+        "title": "%Register MCP Server to AI Assistants...%",
+        "category": "%Sqlens%",
+        "icon": "$(mcp)"
+      },
+      {
+        "command": "sqlens.mcp.copyConfig",
+        "title": "%Copy MCP Config Snippet%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.mcp.showActivity",
+        "title": "%Show AI Activity Log%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.mcp.clearActivity",
+        "title": "%Clear AI Activity Log%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.mcp.copyEndpoint",
+        "title": "%Copy MCP Endpoint URL%",
+        "category": "%Sqlens%"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "sqlens.newConnection",
+          "when": "view == sqlens.connections",
+          "group": "navigation"
+        },
+        {
+          "command": "sqlens.newConnectionGroup",
+          "when": "view == sqlens.connections",
+          "group": "navigation"
+        },
+        {
+          "command": "sqlens.refreshSavedQueries",
+          "when": "view == sqlens.savedQueries",
+          "group": "navigation"
+        },
+        {
+          "command": "sqlens.refreshConnections",
+          "when": "view == sqlens.connections",
+          "group": "navigation"
+        },
+        {
+          "command": "sqlens.newQuery",
+          "when": "view == sqlens.connections && sqlens.hasActiveConnection",
+          "group": "navigation"
+        },
+        {
+          "command": "sqlens.refreshSchema",
+          "when": "view == sqlens.schema",
+          "group": "navigation"
+        },
+        {
+          "command": "sqlens.createTable",
+          "when": "view == sqlens.schema && sqlens.hasActiveConnection",
+          "group": "navigation"
+        },
+        {
+          "command": "sqlens.mcp.register",
+          "when": "view == sqlens.connections",
+          "group": "navigation@9"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "sqlens.connect",
+          "when": "view == sqlens.connections && viewItem =~ /connection-disconnected/",
+          "group": "inline"
+        },
+        {
+          "command": "sqlens.disconnect",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "group": "inline"
+        },
+        {
+          "command": "sqlens.selectConnection",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "group": "1_manage@0"
+        },
+        {
+          "command": "sqlens.editConnection",
+          "when": "view == sqlens.connections && viewItem =~ /^connection/",
+          "group": "1_manage@1"
+        },
+        {
+          "command": "sqlens.saveConnectionToProject",
+          "when": "view == sqlens.connections && (viewItem == connection-connected || viewItem == connection-disconnected)",
+          "group": "1_manage@2"
+        },
+        {
+          "command": "sqlens.moveConnectionToGroup",
+          "when": "view == sqlens.connections && viewItem =~ /^connection/",
+          "group": "1_manage@3"
+        },
+        {
+          "command": "sqlens.newSavedQuery",
+          "when": "view == sqlens.connections && viewItem =~ /^connection/",
+          "group": "2_query@0"
+        },
+        {
+          "command": "sqlens.newSavedQuery",
+          "when": "view == sqlens.savedQueries && viewItem == savedQueryConnection",
+          "group": "inline"
+        },
+        {
+          "command": "sqlens.renameSavedQuery",
+          "when": "view == sqlens.savedQueries && viewItem == savedQuery",
+          "group": "1_manage@1"
+        },
+        {
+          "command": "sqlens.deleteSavedQuery",
+          "when": "view == sqlens.savedQueries && viewItem == savedQuery",
+          "group": "3_danger@1"
+        },
+        {
+          "command": "sqlens.renameConnectionGroup",
+          "when": "view == sqlens.connections && viewItem == group",
+          "group": "1_manage@1"
+        },
+        {
+          "command": "sqlens.deleteConnectionGroup",
+          "when": "view == sqlens.connections && viewItem == group",
+          "group": "3_danger@1"
+        },
+        {
+          "command": "sqlens.newQuery",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "group": "2_query@1"
+        },
+        {
+          "command": "sqlens.erDiagram",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "group": "2_query@2"
+        },
+        {
+          "command": "sqlens.openTerminal",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "group": "2_query@3"
+        },
+        {
+          "command": "sqlens.createDatabase",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "group": "2_query@4"
+        },
+        {
+          "command": "sqlens.deleteConnection",
+          "when": "view == sqlens.connections && viewItem =~ /^connection/",
+          "group": "3_danger@1"
+        },
+        {
+          "command": "sqlens.refreshDatabases",
+          "when": "view == sqlens.connections && viewItem =~ /^database/",
+          "group": "1_actions@0"
+        },
+        {
+          "command": "sqlens.editDatabase",
+          "when": "view == sqlens.connections && viewItem =~ /^database/",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "sqlens.dumpDatabase",
+          "when": "view == sqlens.connections && viewItem =~ /^database/",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "sqlens.importDatabase",
+          "when": "view == sqlens.connections && viewItem =~ /^database/",
+          "group": "1_actions@3"
+        },
+        {
+          "command": "sqlens.erDiagram",
+          "when": "view == sqlens.connections && viewItem =~ /^database/",
+          "group": "2_query@1"
+        },
+        {
+          "command": "sqlens.openTable",
+          "when": "view == sqlens.schema && viewItem == table",
+          "group": "inline"
+        },
+        {
+          "command": "sqlens.openStructure",
+          "when": "view == sqlens.schema && viewItem == table",
+          "group": "1_view@1"
+        },
+        {
+          "command": "sqlens.showDDL",
+          "when": "view == sqlens.schema && viewItem == table",
+          "group": "1_view@2"
+        },
+        {
+          "command": "sqlens.copyCreateTable",
+          "when": "view == sqlens.schema && viewItem == table",
+          "group": "1_view@3"
+        },
+        {
+          "command": "sqlens.renameTable",
+          "when": "view == sqlens.schema && viewItem == table",
+          "group": "2_actions@3"
+        },
+        {
+          "command": "sqlens.exportData",
+          "when": "view == sqlens.schema && viewItem == table",
+          "group": "2_actions@1"
+        },
+        {
+          "command": "sqlens.importData",
+          "when": "view == sqlens.schema && viewItem == table",
+          "group": "2_actions@2"
+        },
+        {
+          "command": "sqlens.truncateTable",
+          "when": "view == sqlens.schema && viewItem == table",
+          "group": "3_danger@1"
+        },
+        {
+          "command": "sqlens.dropTable",
+          "when": "view == sqlens.schema && viewItem == table",
+          "group": "3_danger@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "sqlens.runQuery",
+          "when": "resourceLangId == sql",
+          "group": "navigation@1"
+        },
+        {
+          "command": "sqlens.saveQuery",
+          "when": "resourceLangId == sql",
+          "group": "navigation@2"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "sqlens.explainPlan",
+          "when": "resourceLangId == sql",
+          "group": "sqlens@1"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "sqlens.runQuery",
+        "key": "cmd+enter",
+        "mac": "cmd+enter",
+        "when": "resourceLangId == sql"
+      },
+      {
+        "command": "sqlens.runAllQueries",
+        "key": "cmd+shift+enter",
+        "mac": "cmd+shift+enter",
+        "when": "resourceLangId == sql"
+      },
+      {
+        "command": "sqlens.cancelQuery",
+        "key": "cmd+.",
+        "mac": "cmd+.",
+        "when": "sqlens.queryRunning"
+      },
+      {
+        "command": "sqlens.formatSQL",
+        "key": "cmd+shift+l",
+        "mac": "cmd+shift+l",
+        "when": "resourceLangId == sql"
+      },
+      {
+        "command": "sqlens.queryHistory",
+        "key": "cmd+shift+h",
+        "mac": "cmd+shift+h"
+      },
+      {
+        "command": "sqlens.newQuery",
+        "key": "ctrl+t",
+        "mac": "ctrl+t",
+        "when": "sqlens.hasActiveConnection"
+      },
+      {
+        "command": "sqlens.newConnection",
+        "key": "cmd+n",
+        "mac": "cmd+n",
+        "when": "focusedView == sqlens.connections"
+      },
+      {
+        "command": "sqlens.quickSwitcher",
+        "key": "cmd+option+t",
+        "mac": "cmd+option+t",
+        "when": "sqlens.hasActiveConnection"
+      }
+    ],
+    "configuration": {
+      "title": "%Sqlens%",
+      "properties": {
+        "sqlens.defaultRowsPerPage": {
+          "type": "number",
+          "default": 1000,
+          "description": "%Default number of rows per page in the data grid%"
+        },
+        "sqlens.autoSaveQueries": {
+          "type": "boolean",
+          "default": false,
+          "description": "%Auto-save SQL query documents before running them%"
+        },
+        "sqlens.queryTimeout": {
+          "type": "number",
+          "default": 30,
+          "description": "%Query timeout in seconds (0 = no timeout)%"
+        },
+        "sqlens.autoUppercaseKeywords": {
+          "type": "boolean",
+          "default": false,
+          "description": "%Auto-uppercase SQL keywords while typing%"
+        },
+        "sqlens.safeMode": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Require confirmation before executing write queries%"
+        },
+        "sqlens.maxReconnectAttempts": {
+          "type": "number",
+          "default": 3,
+          "description": "%Maximum reconnect attempts on connection loss%"
+        },
+        "sqlens.idleTimeout": {
+          "type": "number",
+          "default": 300,
+          "description": "%Idle connection timeout in seconds (0 = never)%"
+        },
+        "sqlens.codeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Show Run buttons above SQL statements%"
+        },
+        "sqlens.mcp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Start the local MCP server so AI assistants can use Sqlens connections%"
+        },
+        "sqlens.mcp.port": {
+          "type": "number",
+          "default": 37421,
+          "description": "%MCP server port (0 = auto). Falls back to nearby ports if occupied.%"
+        },
+        "sqlens.mcp.readOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Only allow read statements (SELECT/SHOW/DESCRIBE/EXPLAIN) from AI assistants%"
+        },
+        "sqlens.mcp.writeMode": {
+          "type": "string",
+          "enum": [
+            "confirm",
+            "allow",
+            "deny"
+          ],
+          "default": "confirm",
+          "description": "%How AI write statements are handled: ask for confirmation, allow directly, or deny%"
+        },
+        "sqlens.mcp.maxRows": {
+          "type": "number",
+          "default": 100,
+          "description": "%Maximum rows returned to AI assistants per query%"
+        },
+        "sqlens.mcp.maskSensitiveColumns": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Mask values of password/token-like columns in AI query results%"
+        },
+        "sqlens.mcp.activityRetention": {
+          "type": "number",
+          "default": 200,
+          "description": "%Number of AI activity entries to keep (0 = unlimited)%"
+        },
+        "sqlens.mcp.activityPersist": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Persist AI activity to disk; when off, activity is cleared when the window closes%"
+        },
+        "sqlens.sharedConnections": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Share connections across all VS Code forks on this machine via a single config file%"
+        },
+        "sqlens.sharedConnections.storePasswords": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Store connection passwords inside the shared config file (needed for passwords to sync across IDEs)%"
+        },
+        "sqlens.mcp.autoOpenActivity": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Automatically open the AI Activity panel when an AI assistant makes its first call%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "npm run build:ext && npm run build:webview",
+    "build:ext": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --external:better-sqlite3 --external:sql.js --external:cpu-features --external:*.node --format=cjs --platform=node --target=node20",
+    "build:webview": "cd webview-ui && npm run build",
+    "watch": "npm run build:ext -- --watch --sourcemap",
+    "dev": "concurrently \"npm run watch\" \"cd webview-ui && npm run dev\"",
+    "lint": "eslint src/ --ext .ts",
+    "compile:tests": "tsc -p tsconfig.json",
+    "test": "npm run compile:tests && node ./dist/test/runTest.js",
+    "package": "vsce package",
+    "final": "vsce package -o sqlens.vsix",
+    "publish": "vsce publish"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.1",
+    "mysql2": "^3.11.0",
+    "pg": "^8.13.0",
+    "sql-formatter": "^15.4.0",
+    "sql.js": "^1.14.1",
+    "ssh2": "^1.16.0",
+    "uuid": "^11.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "@types/ssh2": "^1.15.0",
+    "@types/uuid": "^10.0.0",
+    "@types/vscode": "^1.95.0",
+    "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.0.0",
+    "concurrently": "^9.0.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.0.0",
+    "glob": "^10.3.12",
+    "mocha": "^10.4.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,166 @@
+/* Tabbed container for everything hosted in the Sqlens panel view. */
+
+.panel-host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+}
+
+/* ── Tab strip ── */
+
+.panel-tabs {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background));
+  border-bottom: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, rgba(255, 255, 255, 0.08)));
+  scrollbar-width: thin;
+}
+
+.panel-tabs::-webkit-scrollbar {
+  height: 3px;
+}
+
+.panel-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  max-width: 220px;
+  padding: 5px 6px 5px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  color: var(--vscode-tab-inactiveForeground, var(--vscode-descriptionForeground));
+  background: var(--vscode-tab-inactiveBackground, transparent);
+  border-right: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, rgba(255, 255, 255, 0.08)));
+  border-top: 1px solid transparent;
+}
+
+.panel-tab:hover {
+  color: var(--vscode-tab-activeForeground, var(--vscode-foreground));
+}
+
+.panel-tab.active {
+  color: var(--vscode-tab-activeForeground, var(--vscode-foreground));
+  background: var(--vscode-tab-activeBackground, var(--vscode-editor-background));
+  border-top-color: var(--vscode-focusBorder, #007acc);
+}
+
+.panel-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.panel-tab:hover .panel-tab-close,
+.panel-tab.active .panel-tab-close {
+  opacity: 0.7;
+}
+
+.panel-tab-close:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
+}
+
+/* ── Panes ── */
+
+.panel-host-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-tab-pane {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel-tab-pane.active {
+  display: flex;
+}
+
+/* Panels are flex children of the pane; let them fill it. */
+.panel-tab-pane > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ── Empty state ── */
+
+.panel-host-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+}
+
+.panel-host-empty h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--vscode-foreground);
+}
+
+.panel-host-empty p {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* ── Tab context menu (right-click) ── */
+.panel-tab-ctxmenu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 120px;
+  padding: 4px 0;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background, #252526));
+  color: var(--vscode-menu-foreground, var(--vscode-editorWidget-foreground, inherit));
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.12));
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  user-select: none;
+}
+
+.panel-tab-ctxitem {
+  padding: 4px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.panel-tab-ctxitem:hover { background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground)); }
+
+.panel-tab-ctxitem.disabled { opacity: 0.4; cursor: default; }
+.panel-tab-ctxitem.disabled:hover { background: transparent; }

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.vsix
+.vscode-test/
+webview-ui/node_modules/
+*.sqlite
+.vscode
+docs
+.DS_Store

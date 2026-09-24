@@ -1,0 +1,546 @@
+.structure-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family, system-ui, -apple-system, sans-serif);
+  overflow: hidden;
+}
+
+.structure-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+  border-top-color: var(--vscode-button-background);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Header */
+.structure-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+.title-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title-area .icon {
+  font-size: 28px;
+}
+
+.title-area h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.sub-info {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-top: 2px;
+  display: block;
+}
+
+/* Tabs */
+.structure-tabs {
+  display: flex;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+  background: var(--vscode-editorGroupHeader-tabsBackground, #252526);
+}
+
+.structure-tabs button {
+  background: none;
+  border: none;
+  color: var(--vscode-tab-inactiveForeground, #808080);
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.structure-tabs button:hover {
+  color: var(--vscode-tab-activeForeground, #ffffff);
+}
+
+.structure-tabs button.active {
+  color: var(--vscode-tab-activeForeground, #ffffff);
+  border-bottom-color: var(--vscode-button-background);
+}
+
+/* Content */
+.structure-content {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+  border-radius: 4px;
+  background: var(--vscode-sideBar-background, rgba(0,0,0,0.05));
+  margin-bottom: 16px;
+}
+
+.structure-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+
+.structure-table th {
+  padding: 10px 14px;
+  background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.02));
+  font-weight: 600;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+}
+
+.structure-table td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.04));
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.structure-table tr:hover td {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.structure-table tr.pk-row td {
+  background: rgba(255, 165, 0, 0.02);
+}
+
+.bold {
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+.type-badge {
+  background: var(--vscode-badge-background, rgba(255,255,255,0.08));
+  color: var(--vscode-badge-foreground, var(--vscode-foreground));
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.null-text {
+  opacity: 0.4;
+  font-style: italic;
+}
+
+.comment-cell {
+  opacity: 0.7;
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Actions and Buttons */
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  margin-right: 4px;
+}
+
+.btn-icon:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.1));
+}
+
+.btn-icon.btn-danger:hover {
+  background: rgba(255, 70, 70, 0.1);
+}
+
+.btn-primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 3px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  align-self: flex-start;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--vscode-button-secondaryBackground, rgba(255,255,255,0.1));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  border: none;
+  border-radius: 3px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255,255,255,0.15));
+}
+
+.add-col-btn {
+  margin-top: 8px;
+}
+
+/* Forms */
+.visual-form {
+  background: var(--vscode-sideBar-background, rgba(0,0,0,0.1));
+  border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.08));
+  padding: 16px;
+  border-radius: 4px;
+  margin-top: 16px;
+}
+
+.visual-form h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.form-row input[type="text"], .form-row select {
+  padding: 5px 8px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-size: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.form-columns-list {
+  margin-bottom: 16px;
+}
+
+.form-columns-list h4 {
+  margin: 0 0 8px 0;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.form-columns-list .checkbox-label {
+  display: inline-flex;
+  margin-right: 14px;
+  margin-bottom: 6px;
+}
+
+/* DDL Tab */
+.ddl-tab {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.ddl-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.ddl-header h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ddl-code {
+  flex: 1;
+  background: var(--vscode-textCodeBlock-background, #1e1e1e);
+  border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.08));
+  padding: 16px;
+  border-radius: 4px;
+  overflow: auto;
+  margin: 0;
+}
+
+.ddl-code code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--vscode-charts-yellow, #d7ba7d);
+}
+
+/* Overlay & Modals */
+.alter-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.alter-modal {
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 6px;
+  width: 400px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.alter-modal h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+}
+
+.form-group {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.form-group input {
+  padding: 6px 10px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-size: 12px;
+}
+
+.form-group-row {
+  margin-bottom: 12px;
+}
+
+.alter-modal .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+/* SQL Preview Panel */
+.sql-preview-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  border-top: 2px solid var(--vscode-focusBorder);
+  padding: 16px 20px;
+  z-index: 90;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.preview-header h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-notificationsWarningIcon-foreground, orange);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.sql-preview-panel .description {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin: 0;
+}
+
+.sql-textarea {
+  width: 100%;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  padding: 8px;
+  border-radius: 3px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Autocomplete */
+.autocomplete-container {
+  position: relative;
+  width: 100%;
+}
+
+.autocomplete-container input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.autocomplete-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--vscode-dropdown-background, #3c3c3c);
+  border: 1px solid var(--vscode-dropdown-border, #3c3c3c);
+  border-radius: 0 0 4px 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 150px;
+  overflow-y: auto;
+  z-index: 150;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.autocomplete-suggestions li {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--vscode-dropdown-foreground, #cccccc);
+  cursor: pointer;
+  text-align: left;
+}
+
+.autocomplete-suggestions li:hover {
+  background: var(--vscode-list-hoverBackground, #04395e);
+  color: var(--vscode-list-activeSelectionForeground, #ffffff);
+}
+
+/* Rename Table Form */
+.rename-btn {
+  margin-left: 12px;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+/* ── Inline editable cells ── */
+
+.structure-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.table-comment-input {
+  margin-left: 10px;
+  padding: 2px 6px;
+  width: 240px;
+  font-size: 11px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  outline: none;
+}
+
+.table-comment-input:hover {
+  border-color: var(--vscode-input-border, rgba(128, 128, 128, 0.3));
+}
+
+.table-comment-input:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.edit-cell {
+  display: inline-block;
+  width: 100%;
+  min-height: 20px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: text;
+}
+
+.edit-cell.static:hover {
+  background: var(--vscode-list-hoverBackground);
+  outline: 1px dashed var(--vscode-focusBorder);
+}
+
+.edit-cell .cell-input,
+.edit-cell input[type='text'] {
+  width: 100%;
+  padding: 2px 4px;
+  font-size: 11px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 3px;
+  outline: none;
+}
+
+.structure-table tr.new-row td {
+  background: var(--vscode-editorWidget-background, rgba(0, 128, 255, 0.06));
+}
+
+.structure-table .description {
+  margin: 0 0 6px;
+  font-size: 11px;
+  opacity: 0.7;
+}
