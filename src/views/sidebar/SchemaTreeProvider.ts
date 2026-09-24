@@ -201,6 +201,9 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   refresh(): void {
+    // Invalidate any in-flight table loads: they belong to a previous
+    // connection state once a refresh (manual or connection change) happens.
+    this.loadGeneration++;
     if (this.refreshTimer) { clearTimeout(this.refreshTimer); }
     this.refreshTimer = setTimeout(() => {
       this.refreshTimer = undefined;
@@ -273,13 +276,23 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
 
   /** Cache keys currently being hydrated with full table stats. */
   private hydratingTables = new Set<string>();
+  /**
+   * Bumped on every refresh/connection change. Async loads capture the value
+   * at start and discard their result when it has gone stale — otherwise a
+   * slow load for a disconnected/switched-away connection would render its
+   * tables into the tree.
+   */
+  private loadGeneration = 0;
 
   private async getTableGroups(connectionId: string, schema?: string): Promise<SchemaTreeItem[]> {
+    const gen = this.loadGeneration;
     const conn = this.connectionManager.activeConnection;
     const driver = this.connectionManager.getDriver(connectionId);
     if (!driver) { return []; }
 
     const currentDb = await driver.getCurrentDatabase().catch(() => '');
+    if (gen !== this.loadGeneration) { return []; }
+
     const cacheKey = `${connectionId}:${currentDb}:${schema || ''}`;
     let tables = this.cachedTables.get(cacheKey);
 
@@ -293,18 +306,21 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
         if (conn && (conn.config.type === DatabaseType.MySQL || conn.config.type === DatabaseType.MariaDB)
           && typeof mysql.getTableNames === 'function') {
           const fast = await mysql.getTableNames(schema);
+          if (gen !== this.loadGeneration) { return []; }
           tables = fast.map(tf => ({
             name: tf.name,
             schema: schema || currentDb,
             type: tf.type,
           } as TableInfo));
           this.cachedTables.set(cacheKey, tables);
-          this.hydrateTableStats(connectionId, schema, cacheKey);
+          this.hydrateTableStats(connectionId, schema, cacheKey, gen);
         } else {
           tables = await driver.getTables(schema);
+          if (gen !== this.loadGeneration) { return []; }
           this.cachedTables.set(cacheKey, tables);
         }
       } catch (err) {
+        if (gen !== this.loadGeneration) { return []; }
         vscode.window.showErrorMessage(t('Failed to load tables: {0}', err));
         return [];
       }
@@ -314,16 +330,18 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
   }
 
   /** Fetch full table metadata in the background and refresh once it lands. */
-  private hydrateTableStats(connectionId: string, schema: string | undefined, cacheKey: string): void {
+  private hydrateTableStats(connectionId: string, schema: string | undefined, cacheKey: string, gen: number): void {
     if (this.hydratingTables.has(cacheKey)) { return; }
     this.hydratingTables.add(cacheKey);
     const driver = this.connectionManager.getDriver(connectionId);
     if (!driver) { return; }
     void driver.getTables(schema)
       .then(full => {
-        // Only replace the fast list if the user hasn't switched away and a
-        // manual refresh hasn't produced a newer cache entry in the meantime.
-        if (this.cachedTables.get(cacheKey) && this.connectionManager.activeConnectionId === connectionId) {
+        // Discard when the user disconnected or switched connections while
+        // the stats query was in flight.
+        if (gen !== this.loadGeneration) { return; }
+        if (this.connectionManager.activeConnectionId !== connectionId) { return; }
+        if (this.cachedTables.get(cacheKey)) {
           this.cachedTables.set(cacheKey, full);
           this.refresh();
         }
