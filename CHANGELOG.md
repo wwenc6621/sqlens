@@ -2,6 +2,16 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.1.3 (2026-09-24)
+
+### Performance
+
+- Progressive schema tree loading for MySQL-family servers (MySQL/MariaDB/OceanBase): table names render immediately via `SHOW TABLES`, while row counts, sizes, and comments are hydrated in the background. On distributed databases like OceanBase, where the `information_schema.TABLES` stats query can take many seconds, the tree now appears instantly.
+
+### Fixed
+
+- Stale schema tree loads are discarded on disconnect or connection switch (a slow background load for a previous connection can no longer render its tables into the tree).
+
 ## 0.1.2 (2026-09-24)
 
 ### Fixed
