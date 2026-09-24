@@ -34,13 +34,13 @@ Sqlens 是一个完全免费的 VS Code 扩展，用于浏览数据库、运行 
 
 ## 快速开始
 
-1. 从 [VS Code 插件市场](https://marketplace.visualstudio.com/items?itemName=wwenc6621.sqlens) 安装。
+1. 从 [VS Code 插件市场](https://marketplace.visualstudio.com/items?itemName=wwenc6621.sqlens-vscode) 安装。
 2. 打开活动栏中的 Sqlens 视图。
 3. 点击 **新建连接**，选择数据库类型并填写连接信息。
 4. 点击 **测试**，然后 **保存** 并 **连接**。
 
 ```bash
-code --install-extension wwenc6621.sqlens
+code --install-extension wwenc6621.sqlens-vscode
 ```
 
 手动安装 VSIX：参见 [INSTALL_VSIX.md](./INSTALL_VSIX.md)。

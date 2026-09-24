@@ -1,5 +1,5 @@
 {
-  "name": "sqlens",
+  "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
   "description": "A fast, feature-rich database client for VSCode with built-in MCP server. Connect to MySQL, PostgreSQL, SQLite and more. Search: database, db, client, sql, mcp.",
   "version": "0.1.0",

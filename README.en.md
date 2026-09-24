@@ -34,13 +34,13 @@ It works in VS Code and VS Code forks such as Trae, and the UI follows your edit
 
 ## Getting Started
 
-1. Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=wwenc6621.sqlens).
+1. Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=wwenc6621.sqlens-vscode).
 2. Open the Sqlens view in the activity bar.
 3. Click **New Connection**, pick a database type, fill in the details.
 4. Click **Test**, then **Save** and **Connect**.
 
 ```bash
-code --install-extension wwenc6621.sqlens
+code --install-extension wwenc6621.sqlens-vscode
 ```
 
 Manual VSIX installation: see [INSTALL_VSIX.md](./INSTALL_VSIX.md).

@@ -6,7 +6,7 @@ import { DatabaseType } from '../../core/types';
 suite('Extension Integration Test Suite', () => {
   vscode.window.showInformationMessage('Start all tests.');
 
-  const extensionId = 'wwenc6621.sqlens';
+  const extensionId = 'wwenc6621.sqlens-vscode';
 
   test('Extension should be present', () => {
     assert.ok(vscode.extensions.getExtension(extensionId));
