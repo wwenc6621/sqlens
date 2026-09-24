@@ -55,6 +55,14 @@ export class ConnectionItem extends vscode.TreeItem {
 
     this.iconPath = this.getIcon(config.type, connected, isProject);
 
+    // Connected rows get a green label through a file decoration (the same
+    // mechanism Git uses to color modified files); plain TreeItem labels have
+    // no color API. The label is set explicitly so it wins over the URI path.
+    if (connected) {
+      this.resourceUri = vscode.Uri.parse(
+        `sqlens-conn://conn/${encodeURIComponent(config.id)}/connected`, true);
+    }
+
     if (isProject) {
       this.contextValue = connected ? 'connection-connected-project' : 'connection-disconnected-project';
     } else {
@@ -154,6 +162,24 @@ export class DatabaseItem extends vscode.TreeItem {
 }
 
 /**
+ * Colors the label of connected connection rows green via file decorations.
+ * TreeItem labels have no color API of their own; a decoration provider is
+ * the supported way to color them (same mechanism Git uses for changed files).
+ * Decoration colors survive row selection, unlike ThemeIcon colors.
+ */
+class ConnectionDecorationProvider implements vscode.FileDecorationProvider {
+  private _onDidChange = new vscode.EventEmitter<vscode.Uri[]>();
+  readonly onDidChangeFileDecorations = this._onDidChange.event;
+
+  provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
+    if (uri.scheme === 'sqlens-conn' && uri.path.endsWith('/connected')) {
+      return new vscode.FileDecoration(undefined, undefined, new vscode.ThemeColor('charts.green'));
+    }
+    return undefined;
+  }
+}
+
+/**
  * Tree data provider for the Connections sidebar view.
  *
  * Saved connections are grouped by `config.group`; a connected entry expands
@@ -173,6 +199,9 @@ export class ConnectionTreeProvider implements vscode.TreeDataProvider<TreeItem>
     // The active database is highlighted, and switching databases does not
     // change the connection itself, so follow this event as well.
     connectionManager.onActiveConnectionChanged(() => this.refresh());
+    context.subscriptions.push(
+      vscode.window.registerFileDecorationProvider(new ConnectionDecorationProvider())
+    );
   }
 
   /** Coalesce rapid refresh calls so the welcome view never re-renders twice. */
