@@ -102,7 +102,7 @@ export class ConnectionItem extends vscode.TreeItem {
    * Only a live connection gets a colour. Disconnected entries fall back to the
    * plain theme foreground so idle connections read as grey at a glance.
    */
-  private getIcon(type: DatabaseType, connected: boolean, isProject: boolean): vscode.ThemeIcon {
+  private getIcon(type: DatabaseType, connected: boolean, isProject: boolean): vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri } {
     if (isProject) {
       return new vscode.ThemeIcon('project', connected ? new vscode.ThemeColor('charts.green') : undefined);
     }
