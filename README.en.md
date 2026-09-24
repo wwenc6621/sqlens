@@ -65,7 +65,15 @@ The server starts automatically when the extension activates (default). Related 
 
 ### 2. Register into your AI assistant
 
-Run the command **Sqlens: Register MCP Server to AI Assistants...** and pick one or more assistants. Sqlens writes its entry into their MCP config files without touching other entries:
+Click **Register MCP Server to AI Assistants...** in the view title bar (or run the same command from the palette):
+
+![Register button](media/mcp1.png)
+
+Pick one or more assistants in the QuickPick — already-registered ones are checked:
+
+![Pick assistants](media/mcp2.png)
+
+Sqlens writes its entry into their MCP config files without touching other entries:
 
 | Assistant | Config file |
 | --- | --- |
@@ -185,6 +193,10 @@ src/
 webview-ui/      React webview panels (grids, forms, diagrams)
 l10n/            Extension localization bundles
 ```
+
+## Acknowledgements
+
+This project is based on the open-source [TablePro](https://github.com/thanoguyn/tablepro-vscode) (tablepro-vscode) extension, extended and improved upon. Thanks to the original author for open-sourcing it.
 
 ## Support the Project
 

@@ -65,7 +65,15 @@ Sqlens 内置本地 MCP（Model Context Protocol）服务器。启动后，CodeB
 
 ### 2. 注册到 AI 助手
 
-运行命令 **Sqlens: 将 MCP 服务器注册到 AI 助手…**，选择一个或多个助手。Sqlens 只写入自己的 `sqlens` 条目，不影响其他配置：
+点击侧边栏标题栏的 **Register MCP Server to AI Assistants...** 按钮（或运行同名命令）：
+
+![点击注册按钮](media/mcp1.png)
+
+在弹出的列表中选择要注册的 AI 助手（可多选），已注册的会打勾提示：
+
+![选择 AI 助手](media/mcp2.png)
+
+Sqlens 只写入自己的 `sqlens` 条目，不影响其他配置：
 
 | 助手 | 配置文件 |
 | --- | --- |
@@ -174,6 +182,10 @@ npm run build        # 构建扩展 + webview
 npm run compile:tests
 npm run package      # 生成 .vsix
 ```
+
+## 致谢
+
+本项目基于开源项目 [TablePro](https://github.com/thanoguyn/tablepro-vscode)（tablepro-vscode）改造并补充完善，感谢原作者的开源贡献。
 
 ## 支持作者
 
