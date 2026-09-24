@@ -75,13 +75,7 @@ function decryptSecret(value: string): string {
     return value;
   }
   try {
-    let rest = value.slice(ENC_PREFIX.length);
-    if (rest.startsWith(':')) {
-      // Compatibility with the short-lived 0.1.2 build that wrote an extra
-      // empty segment after the prefix.
-      rest = rest.slice(1);
-    }
-    const parts = rest.split(':');
+    const parts = value.slice(ENC_PREFIX.length).split(':');
     if (parts.length !== 3) { return ''; }
     const [ivB64, tagB64, dataB64] = parts;
     const decipher = crypto.createDecipheriv('aes-256-gcm', loadOrCreateKey(), Buffer.from(ivB64, 'base64'));
