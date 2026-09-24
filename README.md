@@ -30,7 +30,6 @@ Sqlens 是一个完全免费的 VS Code 扩展，用于浏览数据库、运行 
 | MySQL / MariaDB 兼容 | 已支持 |
 | PostgreSQL | 已支持 |
 | SQLite | 通过 `sql.js` 支持 |
-| Redis、MongoDB、MSSQL | 规划中 |
 
 ## 快速开始
 

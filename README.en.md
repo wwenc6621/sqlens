@@ -30,7 +30,6 @@ It works in VS Code and VS Code forks such as Trae, and the UI follows your edit
 | MySQL / MariaDB-compatible | Supported |
 | PostgreSQL | Supported |
 | SQLite | Supported via `sql.js` |
-| Redis, MongoDB, MSSQL | Listed for future expansion |
 
 ## Getting Started
 
