@@ -1,21 +1,64 @@
 import * as vscode from 'vscode';
+import * as os from 'os';
+import * as path from 'path';
 import { ConnectionManager } from '../../core/connection/ConnectionManager';
 import { ConnectionConfig } from '../../core/types';
 
 /**
- * Saved queries are plain `.sql` files kept in extension storage, one directory
- * per connection:
+ * Saved queries are plain `.sql` files kept next to the shared connections
+ * file, one directory per connection:
  *
- *   <globalStorage>/saved-queries/<connectionId>/<name>.sql
+ *   ~/.config/sqlens/saved-queries/<connectionId>/<name>.sql   (macOS/Linux)
+ *   %APPDATA%\sqlens\saved-queries\<connectionId>\<name>.sql   (Windows)
  *
- * Using real files means the editor gets normal save/undo/format behaviour, and
- * because the owning connection is part of the path a document can be bound back
- * to its connection without extra bookkeeping.
+ * Keeping them outside any IDE's private storage means VS Code and VS Code
+ * forks (Trae, ...) share the same saved queries, just like the shared
+ * connections file. Legacy files from the old per-IDE globalStorage location
+ * are copied over on first access (never overwritten, never deleted).
  */
 const QUERIES_DIR = 'saved-queries';
 
+function sharedQueriesDir(): string {
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    return path.join(appData, 'sqlens', QUERIES_DIR);
+  }
+  return path.join(os.homedir(), '.config', 'sqlens', QUERIES_DIR);
+}
+
+let legacyMigrated = false;
+
+/** Copy any saved queries from the legacy per-IDE location into the shared dir. */
+async function migrateLegacyQueries(context: vscode.ExtensionContext, sharedRoot: vscode.Uri): Promise<void> {
+  if (legacyMigrated) { return; }
+  legacyMigrated = true;
+  const legacyRoot = vscode.Uri.joinPath(context.globalStorageUri, QUERIES_DIR);
+  try {
+    const entries = await vscode.workspace.fs.readDirectory(legacyRoot);
+    if (entries.length === 0) { return; }
+    await vscode.workspace.fs.createDirectory(sharedRoot);
+    for (const [name] of entries) {
+      const dest = vscode.Uri.joinPath(sharedRoot, name);
+      if (!(await fileExists(dest))) {
+        await vscode.workspace.fs.copy(vscode.Uri.joinPath(legacyRoot, name), dest, { overwrite: false });
+      }
+    }
+    // Park the legacy directory so deleted queries do not resurrect on the
+    // next session.
+    await vscode.workspace.fs.rename(
+      legacyRoot,
+      vscode.Uri.file(`${legacyRoot.path}.migrated`),
+      { overwrite: true },
+    );
+  } catch {
+    // No legacy directory (fresh install): nothing to migrate.
+  }
+}
+
 export function savedQueriesRoot(context: vscode.ExtensionContext): vscode.Uri {
-  return vscode.Uri.joinPath(context.globalStorageUri, QUERIES_DIR);
+  const sharedRoot = vscode.Uri.file(sharedQueriesDir());
+  void migrateLegacyQueries(context, sharedRoot);
+  return sharedRoot;
 }
 
 export function connectionQueriesDir(context: vscode.ExtensionContext, connectionId: string): vscode.Uri {
