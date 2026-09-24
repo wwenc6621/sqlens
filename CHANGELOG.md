@@ -8,6 +8,10 @@ All notable changes to Sqlens are documented here.
 
 - Cross-IDE password prompts: connecting now uses the password carried by the shared connections file first, instead of always asking SecretStorage (which is per-IDE). SecretStorage remains the fallback, and prompting is the last resort.
 
+### Security
+
+- Secrets in the shared connections file are now stored AES-256-GCM encrypted (`enc:v1:...`) instead of plaintext. The 256-bit key lives in `<config dir>/.key` (0600). Existing plaintext passwords are migrated to encrypted form automatically on first read.
+
 ## 0.1.1 (2026-09-24)
 
 ### Fixed
