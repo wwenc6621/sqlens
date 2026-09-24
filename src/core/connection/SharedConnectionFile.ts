@@ -62,8 +62,7 @@ function encryptSecret(plain: string): string {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', loadOrCreateKey(), iv);
   const data = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
-  return [
-    ENC_PREFIX,
+  return ENC_PREFIX + [
     iv.toString('base64'),
     cipher.getAuthTag().toString('base64'),
     data.toString('base64'),
@@ -76,7 +75,15 @@ function decryptSecret(value: string): string {
     return value;
   }
   try {
-    const [ivB64, tagB64, dataB64] = value.slice(ENC_PREFIX.length).split(':');
+    let rest = value.slice(ENC_PREFIX.length);
+    if (rest.startsWith(':')) {
+      // Compatibility with the short-lived 0.1.2 build that wrote an extra
+      // empty segment after the prefix.
+      rest = rest.slice(1);
+    }
+    const parts = rest.split(':');
+    if (parts.length !== 3) { return ''; }
+    const [ivB64, tagB64, dataB64] = parts;
     const decipher = crypto.createDecipheriv('aes-256-gcm', loadOrCreateKey(), Buffer.from(ivB64, 'base64'));
     decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
     return Buffer.concat([decipher.update(Buffer.from(dataB64, 'base64')), decipher.final()]).toString('utf8');
@@ -125,9 +132,12 @@ export function loadSharedConnections(): ConnectionConfig[] {
     return [];
   }
 
-  // Decrypt secrets for use, and migrate legacy plaintext values in place.
+  // Decrypt secrets for use, and migrate legacy plaintext / malformed
+  // encrypted values in place.
   const decrypted = loaded.map(c => withSecrets(c, decryptSecret));
-  if (loaded.some(hasPlaintextSecrets)) {
+  const needsUpgrade = loaded.some(hasPlaintextSecrets)
+    || JSON.stringify(loaded).includes(`${ENC_PREFIX}:`);
+  if (needsUpgrade) {
     saveSharedConnections(decrypted);
   }
   return decrypted;
