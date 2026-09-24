@@ -2,6 +2,12 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.1.1 (2026-09-24)
+
+### Fixed
+
+- Connections tree stayed empty when the shared-connections backend was enabled: saving wrote to the shared config file, but listing still read the legacy per-IDE storage. Both paths now use the same backend.
+
 ## 0.1.0 (2026-09-24)
 
 First public release.

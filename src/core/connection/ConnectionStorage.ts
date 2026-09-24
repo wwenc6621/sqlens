@@ -67,7 +67,7 @@ export class ConnectionStorage {
 
   async getAll(): Promise<ConnectionConfig[]> {
     const globalConnections = this.filterForCurrentWorkspace(
-      this.context.globalState.get<ConnectionConfig[]>(CONNECTIONS_KEY, [])
+      this.readGlobalConnections()
     );
 
     const projectStorage = new ProjectConnectionStorage(this.context);
