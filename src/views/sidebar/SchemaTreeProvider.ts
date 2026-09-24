@@ -196,8 +196,15 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
     connectionManager.onConnectionChanged(() => this.refresh());
   }
 
+  /** Coalesce rapid refresh calls so the welcome view never re-renders twice. */
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
   refresh(): void {
-    this._onDidChangeTreeData.fire(undefined);
+    if (this.refreshTimer) { clearTimeout(this.refreshTimer); }
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = undefined;
+      this._onDidChangeTreeData.fire(undefined);
+    }, 50);
   }
 
   clearCache(): void {
