@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { t } from '../../core/i18n';
 import { ConnectionManager } from '../../core/connection/ConnectionManager';
 import { TableInfo, ColumnInfo, DatabaseType } from '../../core/types';
+import type { MySQLDriver } from '../../core/drivers/MySQLDriver';
 
 type SchemaTreeItem = SchemaGroupItem | TableGroupItem | TableItem | ColumnItem;
 
@@ -270,7 +271,11 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
     return [];
   }
 
+  /** Cache keys currently being hydrated with full table stats. */
+  private hydratingTables = new Set<string>();
+
   private async getTableGroups(connectionId: string, schema?: string): Promise<SchemaTreeItem[]> {
+    const conn = this.connectionManager.activeConnection;
     const driver = this.connectionManager.getDriver(connectionId);
     if (!driver) { return []; }
 
@@ -280,14 +285,54 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
 
     if (!tables) {
       try {
-        tables = await driver.getTables(schema);
-        this.cachedTables.set(cacheKey, tables);
+        // Progressive loading for MySQL-family servers: SHOW TABLES returns in
+        // milliseconds on distributed databases (OceanBase etc.) where the
+        // information_schema stats query takes many seconds. Render the names
+        // immediately, then hydrate row counts/sizes/comments in the background.
+        const mysql = driver as MySQLDriver;
+        if (conn && (conn.config.type === DatabaseType.MySQL || conn.config.type === DatabaseType.MariaDB)
+          && typeof mysql.getTableNames === 'function') {
+          const fast = await mysql.getTableNames(schema);
+          tables = fast.map(tf => ({
+            name: tf.name,
+            schema: schema || currentDb,
+            type: tf.type,
+          } as TableInfo));
+          this.cachedTables.set(cacheKey, tables);
+          this.hydrateTableStats(connectionId, schema, cacheKey);
+        } else {
+          tables = await driver.getTables(schema);
+          this.cachedTables.set(cacheKey, tables);
+        }
       } catch (err) {
         vscode.window.showErrorMessage(t('Failed to load tables: {0}', err));
         return [];
       }
     }
 
+    return this.buildTableGroups(tables, connectionId, schema);
+  }
+
+  /** Fetch full table metadata in the background and refresh once it lands. */
+  private hydrateTableStats(connectionId: string, schema: string | undefined, cacheKey: string): void {
+    if (this.hydratingTables.has(cacheKey)) { return; }
+    this.hydratingTables.add(cacheKey);
+    const driver = this.connectionManager.getDriver(connectionId);
+    if (!driver) { return; }
+    void driver.getTables(schema)
+      .then(full => {
+        // Only replace the fast list if the user hasn't switched away and a
+        // manual refresh hasn't produced a newer cache entry in the meantime.
+        if (this.cachedTables.get(cacheKey) && this.connectionManager.activeConnectionId === connectionId) {
+          this.cachedTables.set(cacheKey, full);
+          this.refresh();
+        }
+      })
+      .catch(() => { /* stats are optional; the fast list stays usable */ })
+      .finally(() => { this.hydratingTables.delete(cacheKey); });
+  }
+
+  private buildTableGroups(tables: TableInfo[], connectionId: string, schema?: string): SchemaTreeItem[] {
     const regularTables = tables.filter(t => t.type === 'table');
     const views = tables.filter(t => t.type === 'view' || t.type === 'materializedView');
 

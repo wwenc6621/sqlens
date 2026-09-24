@@ -218,6 +218,21 @@ export class MySQLDriver extends BaseDriver {
     return [];
   }
 
+  /**
+   * Fast, stats-free table listing (`SHOW TABLES`). On MySQL-compatible
+   * distributed databases (e.g. OceanBase) information_schema.TABLES can take
+   * many seconds because it aggregates internal statistics; this query returns
+   * in milliseconds so UIs can render the list immediately and hydrate the
+   * stats afterwards via getTables().
+   */
+  async getTableNames(schema?: string): Promise<{ name: string; type: 'table' | 'view' }[]> {
+    this.ensureConnected();
+    const db = schema || this.currentDb;
+    if (!db) { return []; }
+    const result = await this.query(`SHOW TABLES FROM ${this.escapeIdentifier(db)}`);
+    return result.rows.map(row => ({ name: row[0] as string, type: 'table' as const }));
+  }
+
   async getTables(schema?: string): Promise<TableInfo[]> {
     this.ensureConnected();
     const db = schema || this.currentDb;
