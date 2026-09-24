@@ -173,7 +173,9 @@ class ConnectionDecorationProvider implements vscode.FileDecorationProvider {
 
   provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
     if (uri.scheme === 'sqlens-conn' && uri.path.endsWith('/connected')) {
-      return new vscode.FileDecoration(undefined, undefined, new vscode.ThemeColor('charts.green'));
+      // A real decoration token: unlike chart colors, it survives the
+      // active-selection foreground override.
+      return new vscode.FileDecoration(undefined, undefined, new vscode.ThemeColor('gitDecoration.addedResourceForeground'));
     }
     return undefined;
   }

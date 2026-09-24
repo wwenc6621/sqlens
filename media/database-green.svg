@@ -1,4 +1,7 @@
 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <ellipse cx="8" cy="3.5" rx="5.5" ry="2" fill="#3fb950"/>
-  <path d="M2.5 3.5v9c0 1.4 2.46 2.5 5.5 2.5s5.5-1.1 5.5-2.5v-9c-1.22 1.05-3.28 1.7-5.5 1.7S3.72 4.55 2.5 3.5z" fill="#3fb950"/>
+  <g stroke="#3fb950" stroke-width="1" stroke-linecap="round">
+    <ellipse cx="8" cy="4" rx="5" ry="2"/>
+    <path d="M3 4v8c0 1.1 2.24 2 5 2s5-.9 5-2V4"/>
+    <path d="M3 8.2c.9.8 2.8 1.3 5 1.3s4.1-.5 5-1.3"/>
+  </g>
 </svg>
