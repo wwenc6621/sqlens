@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { t } from '../../core/i18n';
 import { ConnectionManager } from '../../core/connection/ConnectionManager';
 import { ConnectionConfig, DATABASE_TYPE_META, DatabaseType } from '../../core/types';
@@ -109,7 +110,13 @@ export class ConnectionItem extends vscode.TreeItem {
     const isFile = type === DatabaseType.SQLite;
 
     if (connected) {
-      return new vscode.ThemeIcon(isFile ? 'file' : 'database', new vscode.ThemeColor('charts.green'));
+      // Use a file-based icon with a hard-coded green fill: ThemeIcon colors
+      // are overridden by the selection foreground when the row is selected,
+      // while file icons keep their own color.
+      const green = (name: string) =>
+        vscode.Uri.file(path.join(__dirname, '..', 'media', name));
+      const svg = isFile ? 'file-green.svg' : 'database-green.svg';
+      return { light: green(svg), dark: green(svg) };
     }
 
     return new vscode.ThemeIcon(isFile ? 'file' : 'database');
@@ -125,10 +132,12 @@ export class DatabaseItem extends vscode.TreeItem {
   ) {
     super(dbName, vscode.TreeItemCollapsibleState.None);
     this.id = `db:${connectionId}:${dbName}`;
-    this.iconPath = new vscode.ThemeIcon(
-      'database',
-      isActive ? new vscode.ThemeColor('charts.green') : undefined,
-    );
+    if (isActive) {
+      const green = vscode.Uri.file(path.join(__dirname, '..', 'media', 'database-green.svg'));
+      this.iconPath = { light: green, dark: green };
+    } else {
+      this.iconPath = new vscode.ThemeIcon('database');
+    }
     // The existing database commands match on these context values.
     this.contextValue = isActive ? 'database-active' : 'database';
     this.description = isActive ? 'active' : '';
