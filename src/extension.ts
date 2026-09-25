@@ -593,6 +593,7 @@ export function activate(context: vscode.ExtensionContext) {
   // ── MCP Server for AI assistants ──
 
   const AI_ACTIVITY_TAB_ID = 'ai-activity';
+  const MCP_TAB_ID = 'mcp-server';
 
   mcpActivity = new ActivityBridge(context);
   mcpService = new McpService(connectionManager, queryHistory, mcpActivity, (table) => {
@@ -648,6 +649,93 @@ export function activate(context: vscode.ExtensionContext) {
     }
   }
 
+  /** Build the serialisable status object shown in the MCP panel. */
+  function buildMcpStatus() {
+    const cfg = vscode.workspace.getConfiguration('sqlens.mcp');
+    const enabled = cfg.get<boolean>('enabled', true);
+    const readOnly = cfg.get<boolean>('readOnly', true);
+    const writeMode = cfg.get<string>('writeMode', 'confirm');
+    const maxRows = cfg.get<number>('maxRows', 100);
+    const status = mcpService
+      ? mcpService.getStatus(extensionContext)
+      : { running: false, endpoint: '', port: 0, token: '' };
+    const registered = mcpRegistrar ? mcpRegistrar.getRegisteredAssistants() : [];
+    const activity = mcpActivity
+      ? { entries: mcpActivity.getEntries().length, pending: mcpActivity.getPendingWrites().length }
+      : { entries: 0, pending: 0 };
+    return {
+      enabled,
+      running: status.running,
+      endpoint: status.endpoint,
+      port: status.port,
+      token: status.token,
+      readOnly,
+      writeMode,
+      maxRows,
+      registeredAssistants: registered,
+      activity,
+    };
+  }
+
+  /** Push current MCP status into the MCP panel tab (creating it on first use). */
+  function postMcpStatus(activate: boolean) {
+    if (!mcpService) { return; }
+    const hasTab = panelTabHandlers.has(MCP_TAB_ID);
+    queryResultsViewProvider.postMessage({
+      type: 'mcpStatus',
+      instanceId: MCP_TAB_ID,
+      tabKind: 'mcp',
+      tabTitle: t('MCP Server'),
+      activate,
+      data: buildMcpStatus(),
+    } as any);
+    if (!hasTab) {
+      panelTabHandlers.set(MCP_TAB_ID, async (message: WebviewMessage) => {
+        const msg = message as any;
+        switch (msg.type) {
+          case 'mcpGetStatus':
+            postMcpStatus(false);
+            return;
+          case 'mcpStart':
+            await mcpService!.start(extensionContext);
+            postMcpStatus(true);
+            return;
+          case 'mcpStop':
+            await mcpService!.stop();
+            postMcpStatus(true);
+            return;
+          case 'mcpRegenerateToken':
+            await mcpService!.regenerateToken(extensionContext);
+            postMcpStatus(true);
+            return;
+          case 'mcpCopyEndpoint': {
+            const ep = mcpService!.endpoint;
+            await vscode.env.clipboard.writeText(ep);
+            vscode.window.showInformationMessage(t('Copied: {0}', ep));
+            return;
+          }
+          case 'mcpCopyConfig':
+            await vscode.env.clipboard.writeText(mcpRegistrar!.configSnippet());
+            vscode.window.showInformationMessage(t('Sqlens MCP config snippet copied to clipboard.'));
+            return;
+          case 'mcpRegister':
+            await mcpRegistrar!.registerInteractive();
+            postMcpStatus(false);
+            return;
+          case 'mcpToggleReadOnly': {
+            const next = Boolean(msg.data?.readOnly);
+            await vscode.workspace.getConfiguration('sqlens.mcp').update('readOnly', next, vscode.ConfigurationTarget.Global);
+            postMcpStatus(false);
+            return;
+          }
+          case 'mcpOpenActivity':
+            postAiActivityData(true);
+            return;
+        }
+      });
+    }
+  }
+
   // Live-update the tab whenever activity changes; auto-open on first AI call.
   context.subscriptions.push(mcpActivity.onDidChange(() => {
     const hasTab = panelTabHandlers.has(AI_ACTIVITY_TAB_ID);
@@ -673,9 +761,23 @@ export function activate(context: vscode.ExtensionContext) {
     } as any);
   }));
 
-  if (vscode.workspace.getConfiguration('sqlens.mcp').get<boolean>('enabled', true)) {
+  const mcpEnabled = vscode.workspace.getConfiguration('sqlens.mcp').get<boolean>('enabled', true);
+  if (mcpEnabled) {
     void mcpService.start(context);
+    // Default the empty panel to the MCP server tab (closable; closing shows the
+    // usual "Nothing open yet" empty state).
+    if (panelTabHandlers.size === 0) {
+      postMcpStatus(true);
+    }
   }
+
+  // Refresh the MCP panel whenever the server starts/stops or the token changes.
+  context.subscriptions.push(mcpService.onDidChangeStatus(() => {
+    void vscode.commands.executeCommand('setContext', 'sqlens.mcpRunning', mcpService.running);
+    if (panelTabHandlers.has(MCP_TAB_ID)) { postMcpStatus(false); }
+  }));
+  // Seed the title-bar icon state so the running (green) icon shows immediately.
+  void vscode.commands.executeCommand('setContext', 'sqlens.mcpRunning', mcpService.running);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('sqlens.mcp.register', () => mcpRegistrar?.registerInteractive()),
@@ -696,6 +798,10 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage(t('Copied: {0}', mcpService.endpoint));
     }),
     vscode.commands.registerCommand('sqlens.mcp.showActivity', () => postAiActivityData(true)),
+    vscode.commands.registerCommand('sqlens.mcp.openPanel', () => postMcpStatus(true)),
+    // Same handler as openPanel; exists only so the title-bar icon can turn
+    // green while the MCP server is running (menu `when` picks the variant).
+    vscode.commands.registerCommand('sqlens.mcp.openPanel.running', () => postMcpStatus(true)),
     vscode.commands.registerCommand('sqlens.mcp.clearActivity', () => mcpActivity?.clear()),
     { dispose: () => void mcpService?.dispose() },
     mcpActivity,

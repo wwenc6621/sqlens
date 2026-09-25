@@ -2,6 +2,25 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.1.5 (2026-09-25)
+
+### Features
+
+- **MCP Server panel** — a dedicated tab in the Sqlens result panel for monitoring and operating the local MCP server.
+  - Shows server status (running/stopped), the bound endpoint (`http://127.0.0.1:<port>/mcp`), the bearer token (reveal/copy/regenerate), and the current access mode (read-only / read-write).
+  - Lists every known AI assistant and whether it is already registered (CodeBuddy / Trae / Trae CN / Copilot).
+  - When `sqlens.mcp.enabled` is on and the result panel is empty, the MCP panel opens by default (closable; closing returns to the "Nothing open yet" empty state).
+  - Live-refreshes whenever the server starts/stops or the token is regenerated.
+  - New command `Sqlens: Open MCP Server Panel` (also reachable from the result panel title bar).
+
+### UI / UX
+
+- Connections sidebar and result-panel title bars both gained an **Open MCP Server Panel** button (icon `$(mcp)`).
+- The MCP panel header is a compact icon-button row: **Refresh**, **Start/Stop Server**, **Register to Assistant...**, plus the **Access Mode** toggle switch placed inline next to the running/stopped badge (hover shows the current mode).
+- The **open-MCP icon turns green while the server is running** and reverts to grey when stopped (a dedicated green `mcp` icon is used for the running state).
+- The Endpoint and Bearer Token sections are **merged into one card** with a full-width **Copy MCP Config** button that copies the complete config JSON (endpoint + `Authorization: Bearer <token>`), ready to paste into any assistant.
+- The MCP panel now **fills the panel width** and **scrolls vertically** when content overflows; the running badge's status dot is green.
+
 ## 0.1.4 (2026-09-25)
 
 ### Features

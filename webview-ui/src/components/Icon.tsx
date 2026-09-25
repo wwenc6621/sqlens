@@ -26,6 +26,7 @@ export type IconName =
   | 'wrench'
   | 'pencil'
   | 'play'
+  | 'stop'
   | 'plus'
   | 'chevronUp'
   | 'chevronDown'
@@ -239,6 +240,9 @@ const FILLED_ICONS: Record<string, React.ReactNode> = {
       <circle cx="12" cy="12" r="1.7" />
       <circle cx="19" cy="12" r="1.7" />
     </>
+  ),
+  stop: (
+    <rect x="6" y="6" width="12" height="12" rx="1.5" />
   ),
   dot: <circle cx="12" cy="12" r="5" />,
 };

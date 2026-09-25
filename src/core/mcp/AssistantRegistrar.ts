@@ -135,6 +135,20 @@ export class AssistantRegistrar {
     }
   }
 
+  /** List every known assistant and whether it currently points at Sqlens. */
+  getRegisteredAssistants(): { id: string; name: string; registered: boolean; configPath: string }[] {
+    const folders = vscode.workspace.workspaceFolders || [];
+    return ASSISTANTS.map(a => {
+      const primary = this.primaryPath(a);
+      let registered = false;
+      try {
+        const raw = fs.existsSync(primary) ? fs.readFileSync(primary, 'utf8') : '';
+        registered = !!raw && !!JSON.parse(raw).mcpServers?.sqlens;
+      } catch { /* treat as not registered */ }
+      return { id: a.id, name: a.label, registered, configPath: primary };
+    });
+  }
+
   /** Returns true if the file was created or modified. */
   private upsertConfig(filePath: string): boolean {
     let json: Record<string, unknown> = {};

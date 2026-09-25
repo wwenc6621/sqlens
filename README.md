@@ -74,6 +74,10 @@ Sqlens 内置本地 MCP（Model Context Protocol）服务器。启动后，CodeB
 
 ![选择 AI 助手](media/mcp2.png)
 
+侧边栏中的 **MCP 服务器面板** 可以查看运行状态、端点与令牌、访问模式（只读 / 读写），已注册的 AI 助手一览，并支持一键复制完整的 MCP 配置 JSON：
+
+![MCP 服务器面板](media/mcp3.png)
+
 Sqlens 只写入自己的 `sqlens` 条目，不影响其他配置：
 
 | 助手 | 配置文件 |

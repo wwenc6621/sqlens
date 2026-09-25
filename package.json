@@ -1,8 +1,8 @@
 {
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
-  "description": "Database client with a built-in MCP server: save multiple MySQL/PostgreSQL/SQLite connections once and let AI assistants query them via MCP — no re-entering hosts or credentials. Search: database, db, mcp, sql, client.",
-  "version": "0.1.4",
+  "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
+  "version": "0.1.5",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
@@ -104,7 +104,9 @@
     "onCommand:sqlens.mcp.copyConfig",
     "onCommand:sqlens.mcp.showActivity",
     "onCommand:sqlens.mcp.clearActivity",
-    "onCommand:sqlens.mcp.copyEndpoint"
+    "onCommand:sqlens.mcp.copyEndpoint",
+    "onCommand:sqlens.mcp.openPanel",
+    "onCommand:sqlens.mcp.openPanel.running"
   ],
   "main": "./dist/extension.js",
   "l10n": "./l10n",
@@ -505,6 +507,18 @@
         "category": "%Sqlens%"
       },
       {
+        "command": "sqlens.mcp.openPanel",
+        "title": "%Open MCP Server Panel%",
+        "category": "%Sqlens%",
+        "icon": "$(mcp)"
+      },
+      {
+        "command": "sqlens.mcp.openPanel.running",
+        "title": "%Open MCP Server Panel%",
+        "category": "%Sqlens%",
+        "icon": "resources/icons/mcp-running.svg"
+      },
+      {
         "command": "sqlens.redisExport",
         "title": "%Redis: Export to JSON%",
         "category": "%Sqlens%"
@@ -553,9 +567,30 @@
           "group": "navigation"
         },
         {
-          "command": "sqlens.mcp.register",
-          "when": "view == sqlens.connections",
+          "command": "sqlens.mcp.openPanel.running",
+          "when": "view == sqlens.connections && sqlens.mcpRunning",
           "group": "navigation@9"
+        },
+        {
+          "command": "sqlens.mcp.openPanel",
+          "when": "view == sqlens.connections && !sqlens.mcpRunning",
+          "group": "navigation@9"
+        },
+        {
+          "command": "sqlens.mcp.openPanel.running",
+          "when": "view == sqlens.queryResultsView && sqlens.mcpRunning",
+          "group": "navigation"
+        },
+        {
+          "command": "sqlens.mcp.openPanel",
+          "when": "view == sqlens.queryResultsView && !sqlens.mcpRunning",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "sqlens.mcp.openPanel.running",
+          "when": "false"
         }
       ],
       "view/item/context": [

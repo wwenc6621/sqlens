@@ -74,6 +74,10 @@ Pick one or more assistants in the QuickPick — already-registered ones are che
 
 ![Pick assistants](media/mcp2.png)
 
+The **MCP Server panel** in the sidebar shows the running status, endpoint and token, access mode (read-only / read-write), registered assistants at a glance, and can copy the full MCP config JSON in one click:
+
+![MCP Server panel](media/mcp3.png)
+
 Sqlens writes its entry into their MCP config files without touching other entries:
 
 | Assistant | Config file |

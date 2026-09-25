@@ -49,6 +49,18 @@ export class McpService {
   get endpoint(): string { return `http://127.0.0.1:${this.port}/mcp`; }
   get running(): boolean { return this.server !== null; }
 
+  private statusSubs = new Set<() => void>();
+
+  /** Subscribe to server start/stop/token changes (used to refresh the MCP panel). */
+  onDidChangeStatus(cb: () => void): vscode.Disposable {
+    this.statusSubs.add(cb);
+    return new vscode.Disposable(() => { this.statusSubs.delete(cb); });
+  }
+
+  private emitStatusChange(): void {
+    for (const cb of this.statusSubs) { cb(); }
+  }
+
   /** Generate/return the stored bearer token. */
   getAuthToken(context: vscode.ExtensionContext): string {
     let token = context.globalState.get<string>('sqlens.mcp.token');
@@ -59,10 +71,16 @@ export class McpService {
     return token;
   }
 
+  /** Serialisable server status for the MCP panel. */
+  getStatus(context: vscode.ExtensionContext): { running: boolean; endpoint: string; port: number; token: string } {
+    return { running: this.running, endpoint: this.endpoint, port: this.port, token: this.getAuthToken(context) };
+  }
+
   async regenerateToken(context: vscode.ExtensionContext): Promise<string> {
     const token = crypto.randomBytes(24).toString('hex');
     await context.globalState.update('sqlens.mcp.token', token);
     this.token = token;
+    this.emitStatusChange();
     return token;
   }
 
@@ -78,6 +96,7 @@ export class McpService {
         await this.listen(port);
         vscode.commands.executeCommand('setContext', 'sqlens.mcpRunning', true);
         Logger.getInstance().logInfo(`MCP server listening at ${this.endpoint}`);
+        this.emitStatusChange();
         return;
       } catch (err: unknown) {
         const code = (err as { code?: string })?.code;
@@ -96,6 +115,7 @@ export class McpService {
     this.server = null;
     await new Promise<void>(resolve => server.close(() => resolve()));
     vscode.commands.executeCommand('setContext', 'sqlens.mcpRunning', false);
+    this.emitStatusChange();
   }
 
   dispose(): Promise<void> { return this.stop(); }

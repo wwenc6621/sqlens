@@ -87,5 +87,6 @@
   "Maximum number of bytes to preview for a Redis value in the grid": "Maximum number of bytes to preview for a Redis value in the grid",
   "Additional Redis commands to block from execution (danger commands are always blocked)": "Additional Redis commands to block from execution (danger commands are always blocked)",
   "Redis: Export to JSON": "Redis: Export to JSON",
-  "Redis: Import from JSON": "Redis: Import from JSON"
+  "Redis: Import from JSON": "Redis: Import from JSON",
+  "Open MCP Server Panel": "Open MCP Server Panel"
 }
