@@ -68,15 +68,15 @@ The server starts automatically when the extension activates (default). Related 
 
 Click **Register MCP Server to AI Assistants...** in the view title bar (or run the same command from the palette):
 
-![Register button](media/mcp1.png)
+![Register button](docs/screenshots/mcp1.png)
 
 Pick one or more assistants in the QuickPick — already-registered ones are checked:
 
-![Pick assistants](media/mcp2.png)
+![Pick assistants](docs/screenshots/mcp2.png)
 
 The **MCP Server panel** in the sidebar shows the running status, endpoint and token, access mode (read-only / read-write), registered assistants at a glance, and can copy the full MCP config JSON in one click:
 
-![MCP Server panel](media/mcp3.png)
+![MCP Server panel](docs/screenshots/mcp3.png)
 
 Sqlens writes its entry into their MCP config files without touching other entries:
 
@@ -210,7 +210,7 @@ This project is based on the open-source [TablePro](https://github.com/thanoguyn
 
 Sqlens is completely free and open source. If it saves you time, you can buy me a coffee on Afdian (爱发电):
 
-![Afdian - buy me a coffee](media/Evan.jpeg)
+![Afdian - buy me a coffee](docs/screenshots/Evan.jpeg)
 
 ## License
 

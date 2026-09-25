@@ -2,6 +2,14 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.1.6 (2026-09-25)
+
+### Branding / Assets
+
+- **Unified Sqlens logo** — the extension icon, the activity-bar icon, the result-panel tab icon, and standalone editor-panel (ER diagram / data grid) icons now all use the composed logo: a grey `database` glyph with a green `MCP` badge in the bottom-right corner.
+- **Asset reorganization** — all runtime icons and the logo were moved from `media/` into `resources/icons/`; README screenshots were moved to `docs/screenshots/` (kept in the package via a `.vscodeignore` exception so the Marketplace README still renders). `media/` was removed.
+- Removed the now-unused `database.svg` (superseded by the composed logo).
+
 ## 0.1.5 (2026-09-25)
 
 ### Features

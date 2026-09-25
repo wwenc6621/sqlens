@@ -126,11 +126,11 @@ export class ConnectionItem extends vscode.TreeItem {
     // ThemeIcon colors. Connected rows use the brand colour, disconnected
     // rows the same logo in grey.
     const iconFile = (name: string) =>
-      vscode.Uri.file(path.join(__dirname, '..', 'media', name));
+      vscode.Uri.file(path.join(__dirname, '..', 'resources/icons', name));
     const brand = `db-${type}${connected ? '' : '-grey'}.svg`;
     const fallback = connected ? (isFile ? 'file-green.svg' : 'database-green.svg') : undefined;
     const greyFallback = 'database-green.svg';
-    const file = fs.existsSync(path.join(__dirname, '..', 'media', brand))
+    const file = fs.existsSync(path.join(__dirname, '..', 'resources/icons', brand))
       ? brand
       : (fallback ?? greyFallback);
     const uri = iconFile(file);
@@ -151,8 +151,8 @@ export class DatabaseItem extends vscode.TreeItem {
     if (isActive && dbType) {
       // Generic database glyph in the brand colour (not the brand logo itself).
       const brand = `dbnode-${dbType}.svg`;
-      const file = fs.existsSync(path.join(__dirname, '..', 'media', brand)) ? brand : 'database-green.svg';
-      const uri = vscode.Uri.file(path.join(__dirname, '..', 'media', file));
+      const file = fs.existsSync(path.join(__dirname, '..', 'resources/icons', brand)) ? brand : 'database-green.svg';
+      const uri = vscode.Uri.file(path.join(__dirname, '..', 'resources/icons', file));
       this.iconPath = { light: uri, dark: uri };
     } else {
       this.iconPath = new vscode.ThemeIcon('database');

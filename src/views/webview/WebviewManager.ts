@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { ExtensionMessage, WebviewMessage } from '../../core/types';
 
 /**
@@ -43,14 +42,14 @@ export class WebviewManager {
         retainContextWhenHidden: true,
         localResourceRoots: [
           vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview'),
-          vscode.Uri.joinPath(this.context.extensionUri, 'media'),
+          vscode.Uri.joinPath(this.context.extensionUri, 'resources/icons'),
         ],
       },
     );
 
     panel.iconPath = {
-      light: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'database.svg'),
-      dark: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'database.svg'),
+      light: vscode.Uri.joinPath(this.context.extensionUri, 'resources/icons', 'logo.svg'),
+      dark: vscode.Uri.joinPath(this.context.extensionUri, 'resources/icons', 'logo.svg'),
     };
 
     // Set HTML content
@@ -138,7 +137,7 @@ export class WebviewManager {
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'index.css')
     );
     const mediaBase = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'media')
+      vscode.Uri.joinPath(this.context.extensionUri, 'resources/icons')
     );
 
     const nonce = this.getNonce();

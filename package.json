@@ -2,13 +2,13 @@
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
   "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
     "url": "https://marketplace.visualstudio.com/publishers/wwenc6621"
   },
-  "icon": "media/logo.png",
+  "icon": "resources/icons/logo.png",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -140,14 +140,14 @@
         {
           "id": "sqlens",
           "title": "%Sqlens%",
-          "icon": "media/database.svg"
+          "icon": "resources/icons/logo.svg"
         }
       ],
       "panel": [
         {
           "id": "sqlens-panel",
           "title": "%Sqlens%",
-          "icon": "media/database.svg"
+          "icon": "resources/icons/logo.svg"
         }
       ]
     },

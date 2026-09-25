@@ -68,15 +68,15 @@ Sqlens 内置本地 MCP（Model Context Protocol）服务器。启动后，CodeB
 
 点击侧边栏标题栏的 **Register MCP Server to AI Assistants...** 按钮（或运行同名命令）：
 
-![点击注册按钮](media/mcp1.png)
+![点击注册按钮](docs/screenshots/mcp1.png)
 
 在弹出的列表中选择要注册的 AI 助手（可多选），已注册的会打勾提示：
 
-![选择 AI 助手](media/mcp2.png)
+![选择 AI 助手](docs/screenshots/mcp2.png)
 
 侧边栏中的 **MCP 服务器面板** 可以查看运行状态、端点与令牌、访问模式（只读 / 读写），已注册的 AI 助手一览，并支持一键复制完整的 MCP 配置 JSON：
 
-![MCP 服务器面板](media/mcp3.png)
+![MCP 服务器面板](docs/screenshots/mcp3.png)
 
 Sqlens 只写入自己的 `sqlens` 条目，不影响其他配置：
 
@@ -199,7 +199,7 @@ npm run package      # 生成 .vsix
 
 Sqlens 完全免费开源。如果它帮你节省了时间，欢迎到[爱发电](https://afdian.com)为我发电：
 
-![爱发电 · 为我发电](media/Evan.jpeg)
+![爱发电 · 为我发电](docs/screenshots/Evan.jpeg)
 
 ## 许可证
 
