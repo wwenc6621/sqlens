@@ -7,6 +7,54 @@ import { ConnectionConfig, DATABASE_TYPE_META, DatabaseType } from '../../core/t
 
 type TreeItem = ConnectionGroupItem | ConnectionItem | DatabaseItem;
 
+/**
+ * Brand colour per database type, as a VS Code theme colour token. Instead of
+ * shipping one tinted SVG per type, we tint the built-in `$(database)` codicon.
+ * Note: `vscode.ThemeColor` only accepts theme colour ids (e.g. `charts.blue`),
+ * NOT raw hex strings — a hex id silently falls back to the default grey. So each
+ * brand maps to the closest built-in token (same mechanism as the connection label).
+ * One source of truth, no per-type icon files to maintain.
+ */
+const DB_BRAND_COLOR: Record<DatabaseType, vscode.ThemeColor> = {
+  [DatabaseType.MySQL]: new vscode.ThemeColor('charts.blue'),
+  [DatabaseType.PostgreSQL]: new vscode.ThemeColor('terminal.ansiBlue'),
+  [DatabaseType.SQLite]: new vscode.ThemeColor('terminal.ansiCyan'),
+  [DatabaseType.Redis]: new vscode.ThemeColor('charts.red'),
+  [DatabaseType.MongoDB]: new vscode.ThemeColor('charts.green'),
+  [DatabaseType.MSSQL]: new vscode.ThemeColor('charts.red'),
+  [DatabaseType.MariaDB]: new vscode.ThemeColor('charts.orange'),
+};
+/** Dim grey for inactive databases / disconnected connections (theme token, not raw hex). */
+const ICON_GREY = new vscode.ThemeColor('descriptionForeground');
+/** Green for connected connections when no brand SVG is present (theme token). */
+const ICON_GREEN = new vscode.ThemeColor('charts.green');
+
+/**
+ * Connection-node icon shared by the Connections and Saved SQL views, so the
+ * same connection shows the same glyph in both: the per-type brand logo SVG
+ * (`db-<type>.svg` / `db-<type>-grey.svg`) when present, otherwise the built-in
+ * `$(database)` / `$(file)` codicon tinted green (connected) or grey.
+ */
+export function getConnectionIcon(
+  type: DatabaseType,
+  connected: boolean,
+  isProject: boolean,
+): vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri } {
+  if (isProject) {
+    return new vscode.ThemeIcon('project', connected ? new vscode.ThemeColor('charts.green') : undefined);
+  }
+
+  const isFile = type === DatabaseType.SQLite;
+  const iconFile = (name: string) =>
+    vscode.Uri.file(path.join(__dirname, '..', 'resources/icons', name));
+  const brand = `db-${type}${connected ? '' : '-grey'}.svg`;
+  if (fs.existsSync(path.join(__dirname, '..', 'resources/icons', brand))) {
+    return { light: iconFile(brand), dark: iconFile(brand) };
+  }
+  const tint = connected ? ICON_GREEN : ICON_GREY;
+  return new vscode.ThemeIcon(isFile ? 'file' : 'database', tint);
+}
+
 /** globalState key holding folders that must survive even while empty. */
 const GROUPS_KEY = 'sqlens.connectionGroups';
 
@@ -116,25 +164,7 @@ export class ConnectionItem extends vscode.TreeItem {
    * plain theme foreground so idle connections read as grey at a glance.
    */
   private getIcon(type: DatabaseType, connected: boolean, isProject: boolean): vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri } {
-    if (isProject) {
-      return new vscode.ThemeIcon('project', connected ? new vscode.ThemeColor('charts.green') : undefined);
-    }
-
-    const isFile = type === DatabaseType.SQLite;
-
-    // File-based icons keep their own colour on row selection, unlike
-    // ThemeIcon colors. Connected rows use the brand colour, disconnected
-    // rows the same logo in grey.
-    const iconFile = (name: string) =>
-      vscode.Uri.file(path.join(__dirname, '..', 'resources/icons', name));
-    const brand = `db-${type}${connected ? '' : '-grey'}.svg`;
-    const fallback = connected ? (isFile ? 'file-green.svg' : 'database-green.svg') : undefined;
-    const greyFallback = 'database-green.svg';
-    const file = fs.existsSync(path.join(__dirname, '..', 'resources/icons', brand))
-      ? brand
-      : (fallback ?? greyFallback);
-    const uri = iconFile(file);
-    return { light: uri, dark: uri };
+    return getConnectionIcon(type, connected, isProject);
   }
 }
 
@@ -149,13 +179,12 @@ export class DatabaseItem extends vscode.TreeItem {
     super(dbName, vscode.TreeItemCollapsibleState.None);
     this.id = `db:${connectionId}:${dbName}`;
     if (isActive && dbType) {
-      // Generic database glyph in the brand colour (not the brand logo itself).
-      const brand = `dbnode-${dbType}.svg`;
-      const file = fs.existsSync(path.join(__dirname, '..', 'resources/icons', brand)) ? brand : 'database-green.svg';
-      const uri = vscode.Uri.file(path.join(__dirname, '..', 'resources/icons', file));
-      this.iconPath = { light: uri, dark: uri };
+      // Tint the built-in $(database) codicon with the brand colour so the
+      // shape stays identical between active/inactive and across types.
+      this.iconPath = new vscode.ThemeIcon('database', DB_BRAND_COLOR[dbType]);
     } else {
-      this.iconPath = new vscode.ThemeIcon('database');
+      // Inactive: same codicon, dimmed to grey.
+      this.iconPath = new vscode.ThemeIcon('database', ICON_GREY);
     }
     // The existing database commands match on these context values.
     this.contextValue = isActive ? 'database-active' : 'database';

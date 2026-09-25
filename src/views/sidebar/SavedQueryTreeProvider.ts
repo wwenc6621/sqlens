@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { ConnectionManager } from '../../core/connection/ConnectionManager';
 import { ConnectionConfig } from '../../core/types';
+import { getConnectionIcon } from './ConnectionTreeProvider';
 
 /**
  * Saved queries are plain `.sql` files kept next to the shared connections
@@ -67,10 +68,12 @@ export class SavedQueryConnectionItem extends vscode.TreeItem {
     this.id = `savedQueryConnection:${config.id}`;
     this.description = queryCount === 1 ? '1 query' : `${queryCount} queries`;
     this.tooltip = `${config.name || 'Untitled'} — ${queryCount} saved ${queryCount === 1 ? 'query' : 'queries'}`;
-    // Same colour rule as the Connections view: live = coloured, idle = grey.
-    this.iconPath = new vscode.ThemeIcon(
-      'database',
-      connected ? new vscode.ThemeColor('charts.green') : undefined,
+    // Same icon as the Connections view: the per-type brand logo (or a tinted
+    // codicon fallback), so a connection looks identical in both views.
+    this.iconPath = getConnectionIcon(
+      config.type,
+      connected,
+      config.options?.sqlensProjectConfig === true || config.tags?.includes('project-config'),
     );
     this.contextValue = 'savedQueryConnection';
   }

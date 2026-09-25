@@ -2,6 +2,13 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.1.7 (2026-09-25)
+
+### Sidebar icons
+
+- Replaced the per-type tinted cylinder SVGs (`dbnode-*.svg`, `database-green.svg`, `database-grey.svg`, `file-green.svg`) with the built-in `$(database)` / `$(file)` codicons tinted by brand colour via `vscode.ThemeIcon` + `vscode.ThemeColor`. Active databases now show the codicon in the type's brand colour; inactive databases show it in grey — same glyph, colour signals state. A single `DB_BRAND_COLOR` map replaces a dozen icon files to maintain.
+- Connection-level fallback icons (when a `db-<type>.svg` brand logo is missing) also use the tinted codicons instead of the green/grey cylinder SVGs. Brand logo SVGs (`db-<type>.svg` / `db-<type>-grey.svg`) are still used at the connection level.
+
 ## 0.1.6 (2026-09-25)
 
 ### Branding / Assets

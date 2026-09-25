@@ -2,7 +2,7 @@
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
   "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
