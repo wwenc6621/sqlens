@@ -3,8 +3,10 @@ import { t } from '../../core/i18n';
 import { ConnectionManager } from '../../core/connection/ConnectionManager';
 import { TableInfo, ColumnInfo, DatabaseType } from '../../core/types';
 import type { MySQLDriver } from '../../core/drivers/MySQLDriver';
+import type { RedisDriver } from '../../core/drivers/RedisDriver';
+import { isRedisGroup, encodeRedisKeyTable } from '../../core/drivers/redisTableEncoding';
 
-type SchemaTreeItem = SchemaGroupItem | TableGroupItem | TableItem | ColumnItem;
+type SchemaTreeItem = SchemaGroupItem | TableGroupItem | TableItem | ColumnItem | RedisKeyItem;
 
 class SchemaGroupItem extends vscode.TreeItem {
   constructor(
@@ -178,6 +180,40 @@ class ColumnItem extends vscode.TreeItem {
   }
 }
 
+class RedisKeyItem extends vscode.TreeItem {
+  constructor(
+    public readonly keyName: string,
+    public readonly keyType: string,
+    connectionId: string,
+    ttl: number,
+    size: number,
+  ) {
+    super(keyName, vscode.TreeItemCollapsibleState.None);
+    this.iconPath = new vscode.ThemeIcon('symbol-variable', new vscode.ThemeColor('charts.red'));
+    this.contextValue = 'redisKey';
+
+    const ttlText = ttl === -1 ? '∞' : ttl < 0 ? '?' : `${ttl}s`;
+    const parts = [`${keyType}`, `TTL ${ttlText}`];
+    if (size > 0) { parts.push(`${size}B`); }
+    this.description = parts.join(' • ');
+
+    const md = new vscode.MarkdownString();
+    md.supportThemeIcons = true;
+    md.appendMarkdown(`**${keyName}**\n\n`);
+    md.appendMarkdown(`${t('Type')}: \`${keyType}\`\n\n`);
+    md.appendMarkdown(`${t('TTL')}: ${ttlText}\n\n`);
+    if (size > 0) { md.appendMarkdown(`${t('Size')}: ${size} B\n\n`); }
+    md.appendMarkdown('_' + t('Double-click to open entries') + '_');
+    this.tooltip = md;
+
+    this.command = {
+      command: 'sqlens.openTable',
+      title: t('Open Key'),
+      arguments: [connectionId, { name: encodeRedisKeyTable(keyType, keyName), type: 'table' as const }],
+    };
+  }
+}
+
 /**
  * Tree data provider for the Schema sidebar view.
  * Shows database objects (tables, views, columns) for the active connection.
@@ -240,8 +276,11 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
     const connectionId = this.connectionManager.activeConnectionId!;
     const driver = conn.driver;
 
-    // Column level
+    // Column level — Redis type groups expand into their keys instead.
     if (element instanceof TableItem) {
+      if (conn.config.type === DatabaseType.Redis && isRedisGroup(element.tableInfo.name)) {
+        return this.getRedisKeys(element.tableInfo.name, connectionId);
+      }
       return this.getColumnsForTable(element.tableInfo.name, connectionId, element.tableInfo.schema);
     }
 
@@ -360,6 +399,20 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
       groups.push(new TableGroupItem(t('Views'), 'views', connectionId, views, schema));
     }
     return groups;
+  }
+
+  private async getRedisKeys(group: string, connectionId: string): Promise<SchemaTreeItem[]> {
+    const driver = this.connectionManager.getDriver(connectionId) as RedisDriver | undefined;
+    if (!driver || typeof (driver as any).getKeyList !== 'function') { return []; }
+    try {
+      const { result } = await driver.getKeyList(group, 0, 200);
+      return result.rows.map(r =>
+        new RedisKeyItem(String(r[0]), String(r[1]), connectionId, Number(r[2]), Number(r[3])),
+      );
+    } catch (err) {
+      vscode.window.showErrorMessage(t('Failed to load Redis keys: {0}', err));
+      return [];
+    }
   }
 
   private async getColumnsForTable(table: string, connectionId: string, schema?: string): Promise<ColumnItem[]> {

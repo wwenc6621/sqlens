@@ -2,7 +2,7 @@
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
   "description": "Database client with a built-in MCP server: save multiple MySQL/PostgreSQL/SQLite connections once and let AI assistants query them via MCP — no re-entering hosts or credentials. Search: database, db, mcp, sql, client.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
@@ -503,6 +503,16 @@
         "command": "sqlens.mcp.copyEndpoint",
         "title": "%Copy MCP Endpoint URL%",
         "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.redisExport",
+        "title": "%Redis: Export to JSON%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.redisImport",
+        "title": "%Redis: Import from JSON%",
+        "category": "%Sqlens%"
       }
     ],
     "menus": {
@@ -616,23 +626,33 @@
         },
         {
           "command": "sqlens.erDiagram",
-          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem !~ /redis/",
           "group": "2_query@2"
         },
         {
           "command": "sqlens.openTerminal",
-          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem !~ /redis/",
           "group": "2_query@3"
         },
         {
           "command": "sqlens.createDatabase",
-          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem !~ /redis/",
           "group": "2_query@4"
         },
         {
           "command": "sqlens.deleteConnection",
           "when": "view == sqlens.connections && viewItem =~ /^connection/",
           "group": "3_danger@1"
+        },
+        {
+          "command": "sqlens.redisExport",
+          "when": "view == sqlens.connections && viewItem =~ /redis/",
+          "group": "1_manage@3"
+        },
+        {
+          "command": "sqlens.redisImport",
+          "when": "view == sqlens.connections && viewItem =~ /redis/",
+          "group": "1_manage@4"
         },
         {
           "command": "sqlens.refreshDatabases",
@@ -876,9 +896,32 @@
           "type": "boolean",
           "default": true,
           "description": "%Automatically open the AI Activity panel when an AI assistant makes its first call%"
+        },
+        "sqlens.redis.scanCount": {
+          "type": "number",
+          "default": 100,
+          "description": "%Number of keys scanned per SCAN batch when browsing Redis%"
+        },
+        "sqlens.redis.maxValuePreview": {
+          "type": "number",
+          "default": 512,
+          "description": "%Maximum number of bytes to preview for a Redis value in the grid%"
+        },
+        "sqlens.redis.blockedCommands": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["FLUSHALL", "FLUSHDB", "SHUTDOWN", "CONFIG", "DEBUG", "KEYS", "MIGRATE", "SLAVEOF", "REPLICAOF", "MONITOR"],
+          "description": "%Additional Redis commands to block from execution (danger commands are always blocked)%"
         }
       }
-    }
+    },
+    "languages": [
+      {
+        "id": "redis",
+        "aliases": ["Redis", "redis"],
+        "extensions": [".redis"]
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
@@ -896,6 +939,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",
+    "ioredis": "^5.11.1",
     "mysql2": "^3.11.0",
     "pg": "^8.13.0",
     "sql-formatter": "^15.4.0",

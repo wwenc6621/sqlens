@@ -10,6 +10,7 @@ It works in VS Code and VS Code forks such as Trae, and the UI follows your edit
 
 - Manage database connections from the Sqlens activity bar.
 - Connect to MySQL, PostgreSQL, and SQLite databases.
+- Connect to Redis (standalone / cluster / sentinel, with SSH tunneling and TLS).
 - Open `.db`, `.sqlite`, and `.sqlite3` files with the built-in SQLite viewer.
 - Browse schemas, tables, views, columns, indexes, and foreign keys.
 - Open table data in an editable data grid (sort, filter, paginate, inline edit).
@@ -30,6 +31,7 @@ It works in VS Code and VS Code forks such as Trae, and the UI follows your edit
 | MySQL / MariaDB-compatible | Supported |
 | PostgreSQL | Supported |
 | SQLite | Supported via `sql.js` |
+| Redis | Supported (standalone / cluster / sentinel, ioredis) |
 
 ## Getting Started
 
@@ -56,7 +58,7 @@ The server starts automatically when the extension activates (default). Related 
 | --- | --- | --- |
 | `sqlens.mcp.enabled` | `true` | Start the local MCP server |
 | `sqlens.mcp.port` | `37421` | Server port (`0` = auto); falls back to nearby ports if occupied |
-| `sqlens.mcp.readOnly` | `true` | Only allow read statements (`SELECT/SHOW/DESCRIBE/EXPLAIN`) |
+| `sqlens.mcp.readOnly` | `true` | Only allow read statements (`SELECT/SHOW/DESCRIBE/EXPLAIN`, Redis `GET/HGETALL/SCAN/TYPE/...`) |
 | `sqlens.mcp.writeMode` | `confirm` | Write handling: `confirm` / `allow` / `deny` |
 | `sqlens.mcp.maxRows` | `100` | Max rows returned per query |
 | `sqlens.mcp.maskSensitiveColumns` | `true` | Mask password/token-like columns in results |
@@ -162,6 +164,9 @@ Open or create a `.sql` file, then use:
 | `sqlens.maxReconnectAttempts` | `3` | Maximum reconnect attempts |
 | `sqlens.idleTimeout` | `300` | Idle connection timeout in seconds (`0` disables) |
 | `sqlens.codeLens` | `true` | Show SQL Run CodeLens actions |
+| `sqlens.redis.scanCount` | `100` | Keys scanned per `SCAN` iteration (pagination granularity) |
+| `sqlens.redis.maxValuePreview` | `512` | Max bytes previewed for string values in the grid |
+| `sqlens.redis.blockedCommands` | `[]` | Extra blocked Redis commands (danger commands are always blocked) |
 | `sqlens.sharedConnections` | `true` | Share connections across all VS Code forks on this machine |
 | `sqlens.sharedConnections.storePasswords` | `true` | Store passwords in the shared config file |
 | `sqlens.mcp.*` | — | MCP server settings, see the MCP section above |

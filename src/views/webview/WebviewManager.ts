@@ -137,6 +137,9 @@ export class WebviewManager {
     const styleUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'index.css')
     );
+    const mediaBase = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, 'media')
+    );
 
     const nonce = this.getNonce();
 
@@ -160,6 +163,7 @@ export class WebviewManager {
   <script nonce="${nonce}">
     window.__PANEL_TYPE__ = "${panelType}";
     window.__LOCALE__ = ${JSON.stringify(vscode.env.language || 'en')};
+    window.__MEDIA_BASE__ = "${mediaBase.toString()}";
   </script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

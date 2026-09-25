@@ -82,5 +82,10 @@
   "Persist AI activity to disk; when off, activity is cleared when the window closes": "将 AI 活动持久化到磁盘；关闭后窗口关闭时会清空活动记录",
   "Share connections across all VS Code forks on this machine via a single config file": "通过单一配置文件在本机所有 VS Code 系 IDE 之间共享连接",
   "Store connection passwords inside the shared config file (needed for passwords to sync across IDEs)": "将连接密码保存到共享配置文件中（密码要跨 IDE 同步需要开启此项）",
-  "Automatically open the AI Activity panel when an AI assistant makes its first call": "AI 助手首次调用时自动打开 AI 活动面板"
+  "Automatically open the AI Activity panel when an AI assistant makes its first call": "AI 助手首次调用时自动打开 AI 活动面板",
+  "Number of keys scanned per SCAN batch when browsing Redis": "浏览 Redis 时每次 SCAN 扫描的键数量",
+  "Maximum number of bytes to preview for a Redis value in the grid": "网格中 Redis 值预览的最大字节数",
+  "Additional Redis commands to block from execution (danger commands are always blocked)": "额外禁止执行的 Redis 命令（危险命令始终被拦截）",
+  "Redis: Export to JSON": "Redis：导出为 JSON",
+  "Redis: Import from JSON": "Redis：从 JSON 导入"
 }

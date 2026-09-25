@@ -2,6 +2,32 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.1.4 (2026-09-25)
+
+### Features
+
+- **Redis support (full)** — a `RedisDriver` implementing the full `DatabaseDriver` interface, backed by `ioredis` (bundled into the extension).
+  - **Connection**: connect/disconnect, `PING`+`INFO` test, SSH tunnel + TLS (`rediss://`), and `options.redisMode` = `cluster` / `sentinel` (with `redisNodes` / `redisSentinelName`) reusing ioredis `Cluster` / Sentinel clients.
+  - **Browse**: db-index list (db0..15), key-type groups (Strings/Hashes/Lists/Sets/ZSets/Streams/Other) via `SCAN TYPE`, and per-group key lists in the schema tree (paginated, with type/TTL/size tooltips). Double-click a key opens an **entry grid**.
+  - **Grid + editing**: key-list grid (`key/type/ttl/size`) and per-key entry grid (hash fields, list items, set/zset members, string value, stream entries). Inline edits translate to `HSET/LSET/SADD/ZADD/SET/UNLINK`, TTL via `EXPIRE/PERSIST`, key delete via `UNLINK`; large values are truncated and big hashes capped (`HASH truncated` notice).
+  - **Command editor**: the `.redis` document executes raw Redis commands (the editor is the CLI) with per-line CodeLens "Run".
+- **MCP**: `SecurityGuard` is driver-aware — Redis commands are classified by command tables (read/write/danger), so AI `readOnly`/`writeMode` work; `maxRows` maps to `SCAN`/`COUNT`; the `run_query` tool describes Redis.
+- **Dump/Import**: `Redis: Export to JSON` / `Redis: Import from JSON` commands on a Redis connection (context menu).
+- **Settings**: `sqlens.redis.scanCount`, `sqlens.redis.maxValuePreview`, `sqlens.redis.blockedCommands`.
+- **UI**: Redis-only export/import actions on the connection node; SQL-only actions (ER diagram, terminal, create-DB, dump/import) are hidden for Redis connections.
+- New connection form opens directly (no database-type QuickPick). The form now has a database-type tab strip at the top with per-type brand-coloured icons; switching the tab changes the type (and default port) inline.
+- Required fields in the New Connection form are marked with a red `*` (Connection Name, Host, Port, Username, SQLite Database File, Redis nodes / Master Name, SSH host / username / password).
+
+### Improvements
+
+- The connection-type icons are rendered by a new `DbTypeIcon` component, so adding drivers in the future only needs one row in the type list and one colour entry.
+- Icons are the official brand logos from Simple Icons (CC0-1.0): MySQL dolphin, MariaDB seal, PostgreSQL elephant, SQLite feather, plus Redis/MongoDB/Elasticsearch/SQL Server. Connected rows in the Connections tree now use the brand-coloured icon (file-based, so the colour survives row selection); unconnected rows stay grey.
+
+### Known limitations
+
+- RESP-format dump/import (vs JSON) and `XTRIM`/consumer-group editing in the Stream grid are not implemented yet.
+- Cluster mode uses db0 only (Redis does not support `SELECT` on clusters).
+
 ## 0.1.3 (2026-09-24)
 
 ### Performance

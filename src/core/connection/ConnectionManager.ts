@@ -304,9 +304,15 @@ export class ConnectionManager {
   private async resolvePasswords(config: ConnectionConfig): Promise<ConnectionConfig> {
     const resolved = { ...config, ssh: { ...config.ssh } };
 
+    // An empty password string means "no password" (e.g. a local/Dev Redis with
+    // no auth), which is a valid value — only prompt when the password is
+    // missing entirely (undefined) or explicitly marked as '<ask>'.
     if (resolved.type !== DatabaseType.SQLite) {
-      let pwd = resolved.password || await this.context.secrets.get(`sqlens.pwd.${resolved.id}`);
-      if (!pwd || pwd === '<ask>') {
+      let pwd = resolved.password;
+      if (pwd === undefined || pwd === '<ask>') {
+        pwd = await this.context.secrets.get(`sqlens.pwd.${resolved.id}`);
+      }
+      if (pwd === undefined || pwd === '<ask>') {
         pwd = await vscode.window.showInputBox({
           prompt: `Enter password for connection ${resolved.name || resolved.host}`,
           password: true,
@@ -317,13 +323,16 @@ export class ConnectionManager {
         }
         await this.context.secrets.store(`sqlens.pwd.${resolved.id}`, pwd);
       }
-      resolved.password = pwd;
+      resolved.password = pwd ?? '';
     }
 
     if (resolved.ssh.enabled) {
       if (resolved.ssh.authMethod === 'password') {
-        let sshPwd = resolved.ssh.password || await this.context.secrets.get(`sqlens.ssh.pwd.${resolved.id}`);
-        if (!sshPwd || sshPwd === '<ask>') {
+        let sshPwd = resolved.ssh.password;
+        if (sshPwd === undefined || sshPwd === '<ask>') {
+          sshPwd = await this.context.secrets.get(`sqlens.ssh.pwd.${resolved.id}`);
+        }
+        if (sshPwd === undefined || sshPwd === '<ask>') {
           sshPwd = await vscode.window.showInputBox({
             prompt: `Enter SSH password for connection ${resolved.name || resolved.host}`,
             password: true,
@@ -334,23 +343,24 @@ export class ConnectionManager {
           }
           await this.context.secrets.store(`sqlens.ssh.pwd.${resolved.id}`, sshPwd);
         }
-        resolved.ssh.password = sshPwd;
+        resolved.ssh.password = sshPwd ?? '';
       } else if (resolved.ssh.authMethod === 'privateKey') {
-        if (resolved.ssh.passphrase === '<ask>') {
-          let passphrase = await this.context.secrets.get(`sqlens.ssh.pp.${resolved.id}`);
-          if (!passphrase || passphrase === '<ask>') {
-            passphrase = await vscode.window.showInputBox({
-              prompt: `Enter SSH private key passphrase for connection ${resolved.name || resolved.host}`,
-              password: true,
-              ignoreFocusOut: true,
-            });
-            if (passphrase === undefined) {
-              throw new Error('Connection cancelled: SSH passphrase required');
-            }
-            await this.context.secrets.store(`sqlens.ssh.pp.${resolved.id}`, passphrase);
-          }
-          resolved.ssh.passphrase = passphrase;
+        let passphrase = resolved.ssh.passphrase;
+        if (passphrase === undefined || passphrase === '<ask>') {
+          passphrase = await this.context.secrets.get(`sqlens.ssh.pp.${resolved.id}`);
         }
+        if (passphrase === undefined || passphrase === '<ask>') {
+          passphrase = await vscode.window.showInputBox({
+            prompt: `Enter SSH private key passphrase for connection ${resolved.name || resolved.host}`,
+            password: true,
+            ignoreFocusOut: true,
+          });
+          if (passphrase === undefined) {
+            throw new Error('Connection cancelled: SSH passphrase required');
+          }
+          await this.context.secrets.store(`sqlens.ssh.pp.${resolved.id}`, passphrase);
+        }
+        resolved.ssh.passphrase = passphrase ?? '';
       }
     }
     return resolved;

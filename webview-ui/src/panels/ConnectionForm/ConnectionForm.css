@@ -1,5 +1,46 @@
 /* ── Connection Form ── */
 
+.radio-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.radio-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.18));
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--vscode-foreground);
+  user-select: none;
+}
+
+.radio-pill.active {
+  border-color: var(--vscode-focusBorder, #007acc);
+  background-color: var(--vscode-list-activeSelectionBackground, rgba(0, 122, 204, 0.18));
+  color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
+}
+
+.radio-pill input {
+  margin: 0;
+}
+
+.redis-nodes {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  padding: 6px 8px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.18));
+  border-radius: 4px;
+}
+
 .connection-form {
   display: flex;
   flex-direction: column;
@@ -134,4 +175,47 @@
     padding: 0 16px;
     overflow-x: auto;
   }
+}
+
+/* ── Database type picker (tab strip) ── */
+.db-type-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.08));
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+.db-type-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.db-type-tab:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.db-type-tab.active {
+  color: var(--vscode-foreground);
+  border-color: var(--vscode-focusBorder);
+  background: rgba(0, 120, 215, 0.12);
+}
+
+/* ── Required field marker ── */
+.form-field label .required-mark {
+  color: var(--vscode-errorForeground, #f48771);
+  margin-left: 2px;
+  font-weight: 700;
 }

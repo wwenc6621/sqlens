@@ -363,7 +363,7 @@ export class McpService {
     // ── run_query ──
     mcp.tool(
       'run_query',
-      'Execute a single read-only SQL statement (SELECT/SHOW/DESCRIBE/EXPLAIN/WITH...SELECT). One statement only; a LIMIT is enforced automatically.',
+      'Execute a single read-only statement. For SQL connections this is a SELECT/SHOW/DESCRIBE/EXPLAIN (a LIMIT is enforced automatically). For Redis connections this is a single read command (GET/HGETALL/SCAN/TYPE/TTL/...); one command per call.',
       {
         connectionId: z.string().optional().describe('Connection id from list_connections.'),
         sql: z.string().describe('A single read SQL statement.'),
@@ -372,13 +372,18 @@ export class McpService {
       async (args) => {
         const result = await withActivity('run_query', args, async () => {
           const conn = await this.getDriver(args.connectionId);
-          const guard = this.guard.validate(args.sql, { readOnly: true, allowWrite: false });
+          const driverType = conn.driver.driverType;
+          if (driverType === 'redis') {
+            // maxRows maps to SCAN/collection COUNT for Redis reads.
+            (conn.driver as any).setScanCount?.(Math.min(args.maxRows ?? maxRowsDefault, 1000));
+          }
+          const guard = this.guard.validate(args.sql, { readOnly: true, allowWrite: false, driverType });
           if (!guard.ok) { throw new Error(guard.reason); }
-          const sql = guard.statements![0];
+          const sql = driverType === 'redis' ? args.sql : guard.statements![0];
           const touchedTable = this.guard.extractTable(sql);
           if (touchedTable) { this.revealTable?.(touchedTable, conn.id); }
           const maxRows = Math.min(args.maxRows ?? maxRowsDefault, 1000);
-          const limitSql = this.ensureLimit(sql, maxRows);
+          const limitSql = driverType === 'redis' ? sql : this.ensureLimit(sql, maxRows);
 
           const start = performance.now();
           try {
@@ -432,12 +437,14 @@ export class McpService {
           return textResult({ ok: false, error: 'Write operations are disabled (sqlens.mcp.writeMode = "deny").' }, true);
         }
 
-        const guard = this.guard.validate(args.sql, { readOnly: false, allowWrite: true });
+        const guardConn = await this.getDriver(args.connectionId);
+        const driverType = guardConn.driver.driverType;
+        const guard = this.guard.validate(args.sql, { readOnly: false, allowWrite: true, driverType });
         if (!guard.ok) {
           activity.recordBlocked('write_query', clientName, JSON.stringify(args), guard.reason!);
           return textResult({ ok: false, error: guard.reason }, true);
         }
-        const sql = guard.statements![0];
+        const sql = driverType === 'redis' ? args.sql : guard.statements![0];
 
         if (writeMode === 'confirm') {
           const conn = await this.connectionManager.getSavedConnections().then(cs => cs.find(c => c.id === args.connectionId));

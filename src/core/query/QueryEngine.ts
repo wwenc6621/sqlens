@@ -3,6 +3,7 @@ import { ConnectionManager } from '../connection/ConnectionManager';
 import { QueryResult } from '../types';
 import { QueryHistory } from './QueryHistory';
 import { t } from '../i18n';
+import { classifyRedisCommand, splitRedisCommands } from '../redisCommands';
 
 /**
  * Manages query execution with timeout, cancellation, progress, and history tracking.
@@ -19,8 +20,18 @@ export class QueryEngine {
     return this.runningQuery !== null;
   }
 
-  private isWriteQuery(sql: string): boolean {
+  private isWriteQuery(sql: string, connectionId?: string): boolean {
     const cleanSql = sql.trim().toLowerCase();
+    // Redis has no SQL keywords; classify by command tables instead.
+    if (connectionId) {
+      const driver = this.connectionManager.getDriver(connectionId);
+      if (driver?.driverType === 'redis') {
+        return splitRedisCommands(sql).some(line => {
+          const cat = classifyRedisCommand(line);
+          return cat === 'write' || cat === 'danger';
+        });
+      }
+    }
     const writeKeywords = /\b(insert|update|delete|drop|truncate|alter|create|replace)\b/i;
     return writeKeywords.test(cleanSql);
   }
@@ -46,7 +57,7 @@ export class QueryEngine {
     const configObj = vscode.workspace.getConfiguration('sqlens');
     const safeMode = configObj.get<boolean>('safeMode', true);
 
-    if (safeMode && this.isWriteQuery(sql)) {
+    if (safeMode && this.isWriteQuery(sql, connId)) {
       const confirm = await vscode.window.showWarningMessage(
         t('Safe Mode Alert: You are about to execute a write/modify query. Are you sure you want to proceed?'),
         { modal: true },
@@ -152,7 +163,7 @@ export class QueryEngine {
     const configObj = vscode.workspace.getConfiguration('sqlens');
     const safeMode = configObj.get<boolean>('safeMode', true);
 
-    if (safeMode && this.isWriteQuery(sql)) {
+    if (safeMode && this.isWriteQuery(sql, connId)) {
       const confirm = await vscode.window.showWarningMessage(
         t('Safe Mode Alert: You are about to execute a script containing write/modify queries. Are you sure you want to proceed?'),
         { modal: true },

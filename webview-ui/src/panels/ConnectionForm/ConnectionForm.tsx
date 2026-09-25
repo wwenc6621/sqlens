@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { postMessage, onMessage } from '../../hooks/useVsCode';
 import Icon from '../../components/Icon';
+import DbTypeIcon, { dbLabelColor } from '../../components/DbTypeIcon';
 import { t } from '../../i18n';
 import './ConnectionForm.css';
 
@@ -46,6 +47,7 @@ const DB_TYPES = [
   { value: 'mysql', label: 'MySQL', defaultPort: 3306 },
   { value: 'mariadb', label: 'MariaDB', defaultPort: 3306 },
   { value: 'postgresql', label: 'PostgreSQL', defaultPort: 5432 },
+  { value: 'redis', label: 'Redis', defaultPort: 6379 },
   { value: 'sqlite', label: 'SQLite', defaultPort: 0 },
 ];
 
@@ -65,6 +67,12 @@ const COLORS = [
   { value: '#2ecc71', label: t('Green') },
   { value: '#3498db', label: t('Blue') },
   { value: '#9b59b6', label: t('Purple') },
+];
+
+const REDIS_MODES = [
+  { value: 'standalone', label: t('Standalone') },
+  { value: 'cluster', label: t('Cluster') },
+  { value: 'sentinel', label: t('Sentinel') },
 ];
 
 const defaultForm: FormData = {
@@ -94,6 +102,13 @@ interface SSHConfigHost {
   identityFile?: string;
 }
 
+/** Wrap a label's text with a red required marker. */
+const req = (label: string) => (
+  <>
+    {label}<span className="required-mark">*</span>
+  </>
+);
+
 export default function ConnectionForm() {
   const [form, setForm] = useState<FormData>(defaultForm);
   const [activeTab, setActiveTab] = useState<'general' | 'ssh' | 'ssl' | 'advanced'>('general');
@@ -118,6 +133,10 @@ export default function ConnectionForm() {
 
   const updateField = useCallback((field: string, value: unknown) => {
     setForm(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const updateOption = useCallback((field: string, value: unknown) => {
+    setForm(prev => ({ ...prev, options: { ...prev.options, [field]: value } }));
   }, []);
 
   const updateSSH = useCallback((field: string, value: unknown) => {
@@ -164,7 +183,11 @@ export default function ConnectionForm() {
     setForm(prev => ({
       ...prev,
       type,
-      port: dbType?.defaultPort || prev.port,
+      // Only swap the port if the user hasn't changed it from the previous
+      // type's default (otherwise keep their custom value).
+      port: DB_TYPES.some(d => d.value === prev.type && d.defaultPort === prev.port)
+        ? dbType?.defaultPort ?? prev.port
+        : prev.port,
     }));
   }, []);
 
@@ -179,6 +202,9 @@ export default function ConnectionForm() {
   }, [form]);
 
   const isSQLite = form.type === 'sqlite';
+  const isRedis = form.type === 'redis';
+  const redisMode = (form.options.redisMode as string) || 'standalone';
+  const redisNodesText = ((form.options.redisNodes as string[]) || []).join('\n');
 
   return (
     <div className="connection-form">
@@ -193,6 +219,26 @@ export default function ConnectionForm() {
             <Icon name="save" size={13} /> {t('Save')}
           </button>
         </div>
+      </div>
+
+      {/* Database type picker */}
+      <div className="db-type-tabs">
+        {DB_TYPES.map(dt => {
+          const isActive = form.type === dt.value;
+          return (
+            <button
+              key={dt.value}
+              type="button"
+              className={`db-type-tab${isActive ? ' active' : ''}`}
+              onClick={() => handleTypeChange(dt.value)}
+              title={dt.label}
+              style={isActive ? { color: dbLabelColor(dt.value) } : undefined}
+            >
+              <DbTypeIcon type={dt.value} size={14} />
+              <span>{dt.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Tabs */}
@@ -222,7 +268,7 @@ export default function ConnectionForm() {
           <div className="form-grid">
             <div className="form-row">
               <div className="form-field">
-                <label>{t('Connection Name')}</label>
+                <label>{req(t('Connection Name'))}</label>
                 <input
                   type="text"
                   value={form.name}
@@ -231,19 +277,11 @@ export default function ConnectionForm() {
                   autoFocus
                 />
               </div>
-              <div className="form-field" style={{ maxWidth: 200 }}>
-                <label>{t('Database Type')}</label>
-                <select value={form.type} onChange={e => handleTypeChange(e.target.value)}>
-                  {DB_TYPES.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
             </div>
 
             {isSQLite ? (
               <div className="form-field">
-                <label>{t('Database File')}</label>
+                <label>{req(t('Database File'))}</label>
                 <input
                   type="text"
                   value={form.filepath || form.database || ''}
@@ -254,11 +292,163 @@ export default function ConnectionForm() {
                   placeholder="/path/to/database.sqlite"
                 />
               </div>
+            ) : isRedis ? (
+              <>
+                <div className="form-field">
+                  <label>{t('Redis Mode')}</label>
+                  <div className="radio-group">
+                    {REDIS_MODES.map(m => (
+                      <label key={m.value} className={`radio-pill${redisMode === m.value ? ' active' : ''}`}>
+                        <input
+                          type="radio"
+                          name="redisMode"
+                          value={m.value}
+                          checked={redisMode === m.value}
+                          onChange={() => updateOption('redisMode', m.value)}
+                        />
+                        <span>{m.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {redisMode === 'standalone' && (
+                  <>
+                    <div className="form-row">
+                      <div className="form-field" style={{ flex: 2 }}>
+                        <label>{req(t('Host'))}</label>
+                        <input
+                          type="text"
+                          value={form.host}
+                          onChange={e => updateField('host', e.target.value)}
+                          placeholder="127.0.0.1"
+                        />
+                      </div>
+                      <div className="form-field" style={{ maxWidth: 120 }}>
+                        <label>{req(t('Port'))}</label>
+                        <input
+                          type="number"
+                          value={form.port}
+                          onChange={e => updateField('port', parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <div className="form-field">
+                        <label>{req(t('Username'))}</label>
+                        <input
+                          type="text"
+                          value={form.username}
+                          onChange={e => updateField('username', e.target.value)}
+                          placeholder="default"
+                        />
+                      </div>
+                      <div className="form-field">
+                        <label>{t('Password')}</label>
+                        <input
+                          type="password"
+                          value={form.password}
+                          onChange={e => updateField('password', e.target.value)}
+                          placeholder="••••••••"
+                        />
+                      </div>
+                    </div>
+                    <div className="form-field">
+                      <label>{t('DB Index')}</label>
+                      <input
+                        type="text"
+                        value={form.database}
+                        onChange={e => updateField('database', e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {redisMode === 'cluster' && (
+                  <>
+                    <div className="form-field">
+                      <label>{req(t('Cluster Nodes (one host:port per line)'))}</label>
+                      <textarea
+                        className="redis-nodes"
+                        rows={4}
+                        value={redisNodesText}
+                        onChange={e => updateOption('redisNodes', e.target.value.split('\n').map(s => s.trim()).filter(Boolean))}
+                        placeholder="127.0.0.1:7000&#10;127.0.0.1:7001"
+                      />
+                    </div>
+                    <div className="form-row">
+                      <div className="form-field">
+                        <label>{req(t('Username'))}</label>
+                        <input
+                          type="text"
+                          value={form.username}
+                          onChange={e => updateField('username', e.target.value)}
+                          placeholder="default"
+                        />
+                      </div>
+                      <div className="form-field">
+                        <label>{t('Password')}</label>
+                        <input
+                          type="password"
+                          value={form.password}
+                          onChange={e => updateField('password', e.target.value)}
+                          placeholder="••••••••"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {redisMode === 'sentinel' && (
+                  <>
+                    <div className="form-field">
+                      <label>{req(t('Master Name'))}</label>
+                      <input
+                        type="text"
+                        value={(form.options.redisSentinelName as string) || ''}
+                        onChange={e => updateOption('redisSentinelName', e.target.value)}
+                        placeholder="mymaster"
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label>{req(t('Sentinel Nodes (one host:port per line)'))}</label>
+                      <textarea
+                        className="redis-nodes"
+                        rows={4}
+                        value={redisNodesText}
+                        onChange={e => updateOption('redisNodes', e.target.value.split('\n').map(s => s.trim()).filter(Boolean))}
+                        placeholder="127.0.0.1:26379"
+                      />
+                    </div>
+                    <div className="form-row">
+                      <div className="form-field">
+                        <label>{req(t('Username'))}</label>
+                        <input
+                          type="text"
+                          value={form.username}
+                          onChange={e => updateField('username', e.target.value)}
+                          placeholder="default"
+                        />
+                      </div>
+                      <div className="form-field">
+                        <label>{t('Password')}</label>
+                        <input
+                          type="password"
+                          value={form.password}
+                          onChange={e => updateField('password', e.target.value)}
+                          placeholder="••••••••"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
             ) : (
               <>
                 <div className="form-row">
                   <div className="form-field" style={{ flex: 2 }}>
-                    <label>{t('Host')}</label>
+                    <label>{req(t('Host'))}</label>
                     <input
                       type="text"
                       value={form.host}
@@ -267,7 +457,7 @@ export default function ConnectionForm() {
                     />
                   </div>
                   <div className="form-field" style={{ maxWidth: 120 }}>
-                    <label>{t('Port')}</label>
+                    <label>{req(t('Port'))}</label>
                     <input
                       type="number"
                       value={form.port}
@@ -278,7 +468,7 @@ export default function ConnectionForm() {
 
                 <div className="form-row">
                   <div className="form-field">
-                    <label>{t('Username')}</label>
+                    <label>{req(t('Username'))}</label>
                     <input
                       type="text"
                       value={form.username}
@@ -342,7 +532,7 @@ export default function ConnectionForm() {
                 )}
                 <div className="form-row">
                   <div className="form-field" style={{ flex: 2 }}>
-                    <label>{t('SSH Host')}</label>
+                    <label>{req(t('SSH Host'))}</label>
                     <input
                       type="text"
                       value={form.ssh.host}
@@ -361,7 +551,7 @@ export default function ConnectionForm() {
                 </div>
 
                 <div className="form-field">
-                  <label>{t('SSH Username')}</label>
+                  <label>{req(t('SSH Username'))}</label>
                   <input
                     type="text"
                     value={form.ssh.username}
@@ -384,7 +574,7 @@ export default function ConnectionForm() {
 
                 {form.ssh.authMethod === 'password' && (
                   <div className="form-field">
-                    <label>{t('SSH Password')}</label>
+                    <label>{req(t('SSH Password'))}</label>
                     <input
                       type="password"
                       value={form.ssh.password || ''}

@@ -5,6 +5,8 @@
 
 export type SqlCategory = 'read' | 'write' | 'ddl' | 'other';
 
+import { classifyRedisCommand, splitRedisCommands } from '../redisCommands';
+
 const READ_KEYWORDS = /^(select|show|describe|desc|explain|with|use)\b/i;
 const WRITE_KEYWORDS = /^(insert|update|delete)\b/i;
 const DDL_KEYWORDS = /^(create|alter|drop|truncate|rename|grant|revoke|comment|vacuum|analyze|call|set|lock)\b/i;
@@ -116,11 +118,16 @@ export interface GuardResult {
 
 export class SecurityGuard {
   /**
-   * Validate SQL before execution.
+   * Validate a statement before execution.
    * @param readOnly when true, only read statements pass.
    * @param allowWrite when true (write mode), INSERT/UPDATE/DELETE pass but DDL does not.
+   * @param driverType when provided, classification is driver-aware (see docs §11).
    */
-  validate(sql: string, opts: { readOnly: boolean; allowWrite: boolean }): GuardResult {
+  validate(sql: string, opts: { readOnly: boolean; allowWrite: boolean; driverType?: string }): GuardResult {
+    if (opts.driverType === 'redis') {
+      return this.validateRedis(sql, opts);
+    }
+
     const statements = splitStatements(sql);
 
     if (statements.length === 0) {
@@ -161,6 +168,30 @@ export class SecurityGuard {
     }
 
     return { ok: false, reason: `Statement type "${category}" is not allowed.` };
+  }
+
+  /** Driver-aware validation for Redis (command tables, not SQL keywords). */
+  private validateRedis(sql: string, opts: { readOnly: boolean; allowWrite: boolean }): GuardResult {
+    const lines = splitRedisCommands(sql);
+    if (lines.length === 0) {
+      return { ok: false, reason: 'Empty Redis command' };
+    }
+
+    for (const line of lines) {
+      const category = classifyRedisCommand(line);
+      if (category === 'danger') {
+        const cmd = line.split(/\s+/)[0].toUpperCase();
+        return { ok: false, reason: `Command "${cmd}" is blocked (destructive / administrative).` };
+      }
+      if (opts.readOnly && category === 'write') {
+        return { ok: false, reason: `Read-only mode: write command "${line.split(/\s+/)[0]}" is not allowed.` };
+      }
+      if (category === 'write' && !opts.allowWrite && !opts.readOnly) {
+        return { ok: false, reason: `Write command "${line.split(/\s+/)[0]}" is not allowed (sqlens.mcp.writeMode = "deny").` };
+      }
+    }
+
+    return { ok: true, statements: lines };
   }
 
   /** Mask values of columns that look sensitive. */

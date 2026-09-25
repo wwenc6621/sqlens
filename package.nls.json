@@ -82,5 +82,10 @@
   "Persist AI activity to disk; when off, activity is cleared when the window closes": "Persist AI activity to disk; when off, activity is cleared when the window closes",
   "Share connections across all VS Code forks on this machine via a single config file": "Share connections across all VS Code forks on this machine via a single config file",
   "Store connection passwords inside the shared config file (needed for passwords to sync across IDEs)": "Store connection passwords inside the shared config file (needed for passwords to sync across IDEs)",
-  "Automatically open the AI Activity panel when an AI assistant makes its first call": "Automatically open the AI Activity panel when an AI assistant makes its first call"
+  "Automatically open the AI Activity panel when an AI assistant makes its first call": "Automatically open the AI Activity panel when an AI assistant makes its first call",
+  "Number of keys scanned per SCAN batch when browsing Redis": "Number of keys scanned per SCAN batch when browsing Redis",
+  "Maximum number of bytes to preview for a Redis value in the grid": "Maximum number of bytes to preview for a Redis value in the grid",
+  "Additional Redis commands to block from execution (danger commands are always blocked)": "Additional Redis commands to block from execution (danger commands are always blocked)",
+  "Redis: Export to JSON": "Redis: Export to JSON",
+  "Redis: Import from JSON": "Redis: Import from JSON"
 }

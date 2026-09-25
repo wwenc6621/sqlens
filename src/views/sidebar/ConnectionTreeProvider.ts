@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import * as path from 'path';
 import { t } from '../../core/i18n';
 import { ConnectionManager } from '../../core/connection/ConnectionManager';
@@ -60,13 +61,17 @@ export class ConnectionItem extends vscode.TreeItem {
     // no color API. The label is set explicitly so it wins over the URI path.
     if (connected) {
       this.resourceUri = vscode.Uri.parse(
-        `sqlens-conn://conn/${encodeURIComponent(config.id)}/connected`, true);
+        `sqlens-conn://conn/${encodeURIComponent(config.id)}/${encodeURIComponent(config.type)}`, true);
     }
 
     if (isProject) {
       this.contextValue = connected ? 'connection-connected-project' : 'connection-disconnected-project';
     } else {
       this.contextValue = connected ? 'connection-connected' : 'connection-disconnected';
+    }
+    // Tag Redis connections so context menus can offer Redis-only actions.
+    if (config.type === DatabaseType.Redis) {
+      this.contextValue += ':redis';
     }
 
     this.command = {
@@ -117,17 +122,19 @@ export class ConnectionItem extends vscode.TreeItem {
 
     const isFile = type === DatabaseType.SQLite;
 
-    if (connected) {
-      // Use a file-based icon with a hard-coded green fill: ThemeIcon colors
-      // are overridden by the selection foreground when the row is selected,
-      // while file icons keep their own color.
-      const green = (name: string) =>
-        vscode.Uri.file(path.join(__dirname, '..', 'media', name));
-      const svg = isFile ? 'file-green.svg' : 'database-green.svg';
-      return { light: green(svg), dark: green(svg) };
-    }
-
-    return new vscode.ThemeIcon(isFile ? 'file' : 'database');
+    // File-based icons keep their own colour on row selection, unlike
+    // ThemeIcon colors. Connected rows use the brand colour, disconnected
+    // rows the same logo in grey.
+    const iconFile = (name: string) =>
+      vscode.Uri.file(path.join(__dirname, '..', 'media', name));
+    const brand = `db-${type}${connected ? '' : '-grey'}.svg`;
+    const fallback = connected ? (isFile ? 'file-green.svg' : 'database-green.svg') : undefined;
+    const greyFallback = 'database-green.svg';
+    const file = fs.existsSync(path.join(__dirname, '..', 'media', brand))
+      ? brand
+      : (fallback ?? greyFallback);
+    const uri = iconFile(file);
+    return { light: uri, dark: uri };
   }
 }
 
@@ -137,12 +144,16 @@ export class DatabaseItem extends vscode.TreeItem {
     public readonly dbName: string,
     public readonly connectionId: string,
     public readonly isActive: boolean,
+    public readonly dbType?: DatabaseType,
   ) {
     super(dbName, vscode.TreeItemCollapsibleState.None);
     this.id = `db:${connectionId}:${dbName}`;
-    if (isActive) {
-      const green = vscode.Uri.file(path.join(__dirname, '..', 'media', 'database-green.svg'));
-      this.iconPath = { light: green, dark: green };
+    if (isActive && dbType) {
+      // Generic database glyph in the brand colour (not the brand logo itself).
+      const brand = `dbnode-${dbType}.svg`;
+      const file = fs.existsSync(path.join(__dirname, '..', 'media', brand)) ? brand : 'database-green.svg';
+      const uri = vscode.Uri.file(path.join(__dirname, '..', 'media', file));
+      this.iconPath = { light: uri, dark: uri };
     } else {
       this.iconPath = new vscode.ThemeIcon('database');
     }
@@ -167,17 +178,35 @@ export class DatabaseItem extends vscode.TreeItem {
  * the supported way to color them (same mechanism Git uses for changed files).
  * Decoration colors survive row selection, unlike ThemeIcon colors.
  */
+/**
+ * File decorations accept ThemeColor tokens only (arbitrary hex is not
+ * supported), so each database type maps to the theme colour closest to its
+ * brand colour. Unlike chart colours, decoration tokens survive the
+ * active-selection foreground override.
+ */
+const BRAND_LABEL_TOKENS: Record<string, string> = {
+  mysql: 'charts.blue',
+  mariadb: 'charts.orange',
+  postgresql: 'terminal.ansiBlue',
+  sqlite: 'terminal.ansiCyan',
+  redis: 'charts.red',
+  mongodb: 'charts.green',
+  elasticsearch: 'charts.yellow',
+  mssql: 'charts.red',
+};
+
 class ConnectionDecorationProvider implements vscode.FileDecorationProvider {
   private _onDidChange = new vscode.EventEmitter<vscode.Uri[]>();
   readonly onDidChangeFileDecorations = this._onDidChange.event;
 
   provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
-    if (uri.scheme === 'sqlens-conn' && uri.path.endsWith('/connected')) {
-      // A real decoration token: unlike chart colors, it survives the
-      // active-selection foreground override.
-      return new vscode.FileDecoration(undefined, undefined, new vscode.ThemeColor('gitDecoration.addedResourceForeground'));
-    }
-    return undefined;
+    if (uri.scheme !== 'sqlens-conn') { return undefined; }
+    // Path layout: /conn/<id>/<type>
+    const parts = uri.path.split('/').filter(Boolean);
+    if (parts.length < 3) { return undefined; }
+    const token = BRAND_LABEL_TOKENS[parts[2]];
+    if (!token) { return undefined; }
+    return new vscode.FileDecoration(undefined, undefined, new vscode.ThemeColor(token));
   }
 }
 
@@ -312,7 +341,7 @@ export class ConnectionTreeProvider implements vscode.TreeDataProvider<TreeItem>
       const activeDb = currentDb || config.database || databases[0]?.name;
 
       return databases
-        .map(db => new DatabaseItem(db.name, config.id, db.name === activeDb))
+        .map(db => new DatabaseItem(db.name, config.id, db.name === activeDb, config.type))
         .sort((a, b) => {
           if (a.isActive) { return -1; }
           if (b.isActive) { return 1; }

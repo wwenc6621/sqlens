@@ -12,6 +12,8 @@ import { Logger, LogEntry } from './core/utils/Logger';
 import { WebviewManager } from './views/webview/WebviewManager';
 import { QueryResultsViewProvider } from './views/webview/QueryResultsViewProvider';
 import { SchemaProvider } from './core/schema/SchemaProvider';
+import type { RedisDriver } from './core/drivers/RedisDriver';
+import { isRedisGroup, decodeRedisKeyTable } from './core/drivers/redisTableEncoding';
 import { QueryEngine } from './core/query/QueryEngine';
 import { QueryHistory } from './core/query/QueryHistory';
 import { SQLCompletionProvider } from './views/editor/SQLCompletionProvider';
@@ -565,7 +567,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── Language Features (Phase 2) ──
 
-  const sqlSelector: vscode.DocumentSelector = { language: 'sql' };
+  const sqlSelector: vscode.DocumentSelector = [{ language: 'sql' }, { language: 'redis' }];
 
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(
@@ -752,20 +754,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('sqlens.newConnection', async () => {
-      const dbTypes = DriverFactory.getSupportedTypes();
-      const items = dbTypes.map(type => ({
-        label: DATABASE_TYPE_META[type]?.label || type,
-        description: (t('Port {0}', DATABASE_TYPE_META[type]?.defaultPort || '')),
-        type,
-      }));
-
-      const selected = await vscode.window.showQuickPick(items, {
-        placeHolder: t('Select database type'),
-        title: t('New Connection'),
-      });
-
-      if (!selected) { return; }
-      const config = createDefaultConnectionConfig(selected.type);
+      // Open the form directly; the form has a type tab bar, so no QuickPick
+      // prompt is needed. Default to MySQL.
+      const config = createDefaultConnectionConfig(DatabaseType.MySQL);
       openConnectionForm(config);
     }),
   );
@@ -1397,7 +1388,8 @@ export function activate(context: vscode.ExtensionContext) {
       const requestedDb = typeof item?.database === 'string' ? item.database : undefined;
       const db = requestedDb || await getCurrentDatabaseName(activeConnId);
 
-      const doc = await vscode.workspace.openTextDocument({ language: 'sql', content: '-- New Query\n' });
+      const queryLanguage = conn?.config.type === DatabaseType.Redis ? 'redis' : 'sql';
+      const doc = await vscode.workspace.openTextDocument({ language: queryLanguage, content: queryLanguage === 'redis' ? '# Redis commands\n' : '-- New Query\n' });
       const uri = doc.uri.toString();
 
       queryDocContexts[uri] = {
@@ -1696,6 +1688,12 @@ export function activate(context: vscode.ExtensionContext) {
         const pageSize = config.get<number>('defaultRowsPerPage', 100);
         const dbName = await getCurrentDatabaseName(connectionId);
 
+        // ── Redis: no SQL — open a key-list or entry grid instead ──
+        if (driver.driverType === 'redis') {
+          await openRedisTable(driver as RedisDriver, connectionId, table, schema, dbName, pageSize, gridInstanceId);
+          return;
+        }
+
         const escapedTable = schema
           ? `${driver.escapeIdentifier(schema)}.${driver.escapeIdentifier(table)}`
           : driver.escapeIdentifier(table);
@@ -1837,6 +1835,58 @@ export function activate(context: vscode.ExtensionContext) {
           } as any);
         }
         vscode.window.showErrorMessage(t('Failed to open table: {0}', err));
+      }
+    }),
+  );
+
+  // ── Redis JSON export / import (P4 Dump/Import) ──
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.redisExport', async () => {
+      const connId = connectionManager.activeConnectionId;
+      if (!connId) { vscode.window.showErrorMessage(t('No active connection.')); return; }
+      const driver = connectionManager.getDriver(connId);
+      if (!driver || driver.driverType !== 'redis') {
+        vscode.window.showErrorMessage(t('Redis export requires an active Redis connection.'));
+        return;
+      }
+      const rdriver = driver as RedisDriver;
+      const filter = await vscode.window.showInputBox({ prompt: t('Key pattern to export (default *)'), value: '*' });
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t('Exporting Redis keys...'), cancellable: false },
+        async () => {
+          const data = await rdriver.exportKeys(filter || '*');
+          const uri = await vscode.window.showSaveDialog({
+            defaultUri: vscode.Uri.file(`redis-dump-${Date.now()}.json`),
+            filters: { JSON: ['json'] },
+          });
+          if (!uri) { return; }
+          await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(data, null, 2)));
+          vscode.window.showInformationMessage(t('Exported {0} keys to {1}', Object.keys(data).length, uri.fsPath));
+        },
+      );
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.redisImport', async (uri?: vscode.Uri) => {
+      const connId = connectionManager.activeConnectionId;
+      if (!connId) { vscode.window.showErrorMessage(t('No active connection.')); return; }
+      const driver = connectionManager.getDriver(connId);
+      if (!driver || driver.driverType !== 'redis') {
+        vscode.window.showErrorMessage(t('Redis import requires an active Redis connection.'));
+        return;
+      }
+      const rdriver = driver as RedisDriver;
+      const fileUri = uri || (await vscode.window.showOpenDialog({ canSelectMany: false, filters: { JSON: ['json'] } }))?.[0];
+      if (!fileUri) { return; }
+      try {
+        const bytes = await vscode.workspace.fs.readFile(fileUri);
+        const data = JSON.parse(Buffer.from(bytes).toString('utf8')) as Record<string, any>;
+        const n = await rdriver.importKeys(data);
+        vscode.window.showInformationMessage(t('Imported {0} keys.', n));
+        vscode.commands.executeCommand('sqlens.refreshConnections');
+      } catch (err) {
+        vscode.window.showErrorMessage(t('Redis import failed: {0}', err));
       }
     }),
   );
@@ -3295,6 +3345,116 @@ export function activate(context: vscode.ExtensionContext) {
     }
   }
 
+  // ── Redis grid helpers (no SQL — SCAN / entry commands instead) ──
+
+  async function openRedisTable(
+    driver: RedisDriver,
+    connectionId: string,
+    table: string,
+    schema: string | undefined,
+    dbName: string,
+    pageSize: number,
+    instanceId: string,
+  ): Promise<void> {
+    let columns: ColumnHeader[];
+    let firstResult: QueryResult;
+    let hasMore = false;
+    let querySql = '';
+    let tabTitle = table;
+    if (isRedisGroup(table)) {
+      columns = driver.getKeyListColumns().columns;
+      const r = await driver.getKeyList(table, 0, pageSize);
+      firstResult = r.result; hasMore = r.hasMore;
+      querySql = `SCAN ${table}`;
+      tabTitle = table;
+    } else {
+      const decoded = decodeRedisKeyTable(table);
+      if (!decoded) { return; }
+      columns = driver.getEntryColumns(decoded.type);
+      const r = await driver.getEntryList(decoded.type, decoded.key, 0, pageSize);
+      firstResult = r.result; hasMore = r.hasMore;
+      querySql = `KEY ${decoded.key}`;
+      tabTitle = decoded.key;
+    }
+    const enriched: QueryResult = { ...firstResult, columns };
+    showResultsInDataGrid(tabTitle, enriched, table, schema, connectionId, dbName, pageSize, hasMore, {
+      instanceId,
+      tabKind: 'table',
+      tabTitle,
+      activate: true,
+      querySql,
+      loadingRows: false,
+      inPanel: true,
+    });
+  }
+
+  /**
+   * Route grid messages (paging / save / copy) for Redis tables to the driver's
+   * SCAN/entry APIs. Returns true when the message was handled as Redis.
+   */
+  async function handleRedisGridMessage(
+    message: any,
+    send: (m: any) => void,
+    connId: string,
+    tableName: string,
+  ): Promise<boolean> {
+    const driver = connectionManager.getDriver(connId) as RedisDriver | undefined;
+    if (!driver) { return false; }
+    const isKey = !isRedisGroup(tableName);
+    const pageSize = vscode.workspace.getConfiguration('sqlens').get<number>('defaultRowsPerPage', 1000);
+    try {
+      if (message.type === 'fetchPage') {
+        const page = message.data?.page ?? 0;
+        if (isKey) {
+          const d = decodeRedisKeyTable(tableName);
+          if (!d) { return true; }
+          const { result, hasMore } = await driver.getEntryList(d.type, d.key, page, pageSize);
+          send({ type: 'pageData', page, data: result, columns: result.columns, hasMore, pageSize, querySql: `KEY ${d.key}` } as any);
+        } else {
+          const filter = message.data?.whereFilter as string | undefined;
+          const { result, hasMore } = await driver.getKeyList(tableName, page, pageSize, filter);
+          send({ type: 'pageData', page, data: result, columns: result.columns, hasMore, pageSize, querySql: `SCAN ${tableName}` } as any);
+        }
+        return true;
+      }
+
+      if (message.type === 'saveChanges') {
+        const changedRows = message.data?.rows as any[] ?? [];
+        const columns = isKey
+          ? driver.getEntryColumns(decodeRedisKeyTable(tableName)!.type).map(c => c.name)
+          : driver.getKeyListColumns().columns.map(c => c.name);
+        await driver.applyRedisEdits(tableName, changedRows, columns);
+        vscode.window.showInformationMessage(t('{0} changes saved.', changedRows.length));
+        const r = isKey
+          ? await driver.getEntryList(decodeRedisKeyTable(tableName)!.type, decodeRedisKeyTable(tableName)!.key, 0, pageSize)
+          : await driver.getKeyList(tableName, 0, pageSize);
+        send({ type: 'queryResult', data: r.result, columns: r.result.columns, tableName, schemaName: undefined, pageSize, hasMore: r.hasMore, querySql: tableName } as any);
+        return true;
+      }
+
+      if (message.type === 'copyTableData') {
+        const format: 'csv' | 'tsv' = message.data?.format === 'tsv' ? 'tsv' : 'csv';
+        const separator = format === 'tsv' ? '\t' : ',';
+        const escapeCell = format === 'tsv' ? tsvEscape : csvEscape;
+        const data = isKey
+          ? (await driver.getEntryList(decodeRedisKeyTable(tableName)!.type, decodeRedisKeyTable(tableName)!.key, 0, 5000)).result
+          : (await driver.getKeyList(tableName, 0, 5000)).result;
+        const header = data.columns.map(c => escapeCell(c.name)).join(separator);
+        const body = data.rows.map((row: any[]) => row.map(r => escapeCell(String(r))).join(separator)).join('\n');
+        await vscode.env.clipboard.writeText(`${header}\n${body}`);
+        send({ type: 'copyResult', success: true, message: `Copied ${data.rows.length.toLocaleString()} row${data.rows.length === 1 ? '' : 's'} as ${format.toUpperCase()}` } as any);
+        return true;
+      }
+
+      // countRows: SCAN has no exact total; leave it unknown to the grid.
+      return true;
+    } catch (err) {
+      send({ type: 'error', data: { message: `Redis operation failed: ${err instanceof Error ? err.message : String(err)}` } } as any);
+      vscode.window.showErrorMessage(t('Redis operation failed: {0}', err));
+      return true;
+    }
+  }
+
   function showResultsInDataGrid(
     title: string,
     result: QueryResult,
@@ -3348,6 +3508,15 @@ export function activate(context: vscode.ExtensionContext) {
     const handleMessage = async (message: WebviewMessage) => {
       if (message.type === 'ready') {
         send(messagePayload);
+      }
+
+      // Route Redis grid operations away from the SQL machinery.
+      if ((message.type === 'fetchPage' || message.type === 'saveChanges' || message.type === 'copyTableData') && connId && tableName) {
+        const d = connectionManager.getDriver(connId);
+        if (d && d.driverType === 'redis') {
+          await handleRedisGridMessage(message, send, connId, tableName);
+          return;
+        }
       }
 
       if (message.type === 'rowSelected') {
@@ -4108,6 +4277,29 @@ async function scanWorkspaceForDatabaseConfigs() {
       .filter(Boolean)
       .map(p => path.resolve(p))
   );
+  /**
+   * Names of existing (and already imported) connections, used to keep
+   * auto-imported names short without colliding: the short name is used
+   * unless it is taken, in which case the containing directory is appended.
+   */
+  const usedNames = new Set(savedConnections.map(c => c.name).filter(Boolean) as string[]);
+
+  const uniqueName = (base: string, dirName?: string): string => {
+    if (!usedNames.has(base)) {
+      usedNames.add(base);
+      return base;
+    }
+    const withDir = dirName ? `${base} (${dirName})` : base;
+    if (!usedNames.has(withDir)) {
+      usedNames.add(withDir);
+      return withDir;
+    }
+    let n = 2;
+    while (usedNames.has(`${withDir} ${n}`)) { n++; }
+    const finalName = `${withDir} ${n}`;
+    usedNames.add(finalName);
+    return finalName;
+  };
 
   for (const folder of vscode.workspace.workspaceFolders) {
     const rootPath = folder.uri.fsPath;
@@ -4138,7 +4330,9 @@ async function scanWorkspaceForDatabaseConfigs() {
 
             const newConfig: ConnectionConfig = {
               id: uuidv4(),
-              name: `${workspaceName} - ${config.database ? path.basename(config.database) : 'db'} (${config.type})`,
+              // Short name: the workspace is already shown by the
+              // "Imported (<workspace>)" group, and the type by the icon.
+              name: uniqueName(config.database ? path.basename(config.database) : 'db', dirName),
               type: config.type as DatabaseType,
               host: config.host || '',
               port: config.port || 0,
@@ -4185,9 +4379,11 @@ async function scanWorkspaceForDatabaseConfigs() {
         }
 
         const fileName = path.basename(sqlitePath);
+        const fileDirName = path.basename(path.dirname(sqlitePath));
         const newConfig: ConnectionConfig = {
           id: uuidv4(),
-          name: `${workspaceName} - ${fileName} (sqlite)`,
+          // Short name: group shows the workspace, icon shows the type.
+          name: uniqueName(fileName, fileDirName),
           type: DatabaseType.SQLite,
           host: '',
           port: 0,

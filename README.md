@@ -10,6 +10,7 @@ Sqlens 是一个完全免费的 VS Code 扩展，用于浏览数据库、运行 
 
 - 在 Sqlens 侧边栏管理数据库连接。
 - 连接 MySQL、PostgreSQL、SQLite 数据库。
+- 连接 Redis 数据库（standalone / cluster / sentinel，支持 SSH 隧道与 TLS）。
 - 内置 SQLite 查看器，直接打开 `.db`、`.sqlite`、`.sqlite3` 文件。
 - 浏览库、表、视图、列、索引、外键。
 - 可编辑数据表格（排序、筛选、分页、行内编辑）。
@@ -30,6 +31,7 @@ Sqlens 是一个完全免费的 VS Code 扩展，用于浏览数据库、运行 
 | MySQL / MariaDB 兼容 | 已支持 |
 | PostgreSQL | 已支持 |
 | SQLite | 通过 `sql.js` 支持 |
+| Redis | 已支持（standalone / cluster / sentinel，ioredis） |
 
 ## 快速开始
 
@@ -56,7 +58,7 @@ Sqlens 内置本地 MCP（Model Context Protocol）服务器。启动后，CodeB
 | --- | --- | --- |
 | `sqlens.mcp.enabled` | `true` | 启动本地 MCP 服务器 |
 | `sqlens.mcp.port` | `37421` | 服务器端口（`0` = 自动）；被占用时自动回退到附近端口 |
-| `sqlens.mcp.readOnly` | `true` | 仅允许只读语句（`SELECT/SHOW/DESCRIBE/EXPLAIN`） |
+| `sqlens.mcp.readOnly` | `true` | 仅允许只读语句（`SELECT/SHOW/DESCRIBE/EXPLAIN`，Redis 的 `GET/HGETALL/SCAN/TYPE/...`） |
 | `sqlens.mcp.writeMode` | `confirm` | 写入处理方式：`confirm`（确认）/ `allow`（允许）/ `deny`（拒绝） |
 | `sqlens.mcp.maxRows` | `100` | 每次查询返回的最大行数 |
 | `sqlens.mcp.maskSensitiveColumns` | `true` | 对结果中密码/令牌类列做掩码 |
@@ -162,6 +164,9 @@ Sqlens 为 `*.db`、`*.sqlite`、`*.sqlite3` 注册了自定义编辑器。工�
 | `sqlens.maxReconnectAttempts` | `3` | 最大重连次数 |
 | `sqlens.idleTimeout` | `300` | 空闲连接超时秒数（`0` 永不） |
 | `sqlens.codeLens` | `true` | 显示 SQL 运行 CodeLens |
+| `sqlens.redis.scanCount` | `100` | `SCAN` 每次扫描的键数量（分页精度） |
+| `sqlens.redis.maxValuePreview` | `512` | 网格中字符串值预览的最大字节数 |
+| `sqlens.redis.blockedCommands` | `[]` | 额外禁止执行的 Redis 命令（危险命令始终拦截） |
 | `sqlens.sharedConnections` | `true` | 在本机所有 VS Code 系 IDE 之间共享连接 |
 | `sqlens.sharedConnections.storePasswords` | `true` | 将密码保存到共享配置文件 |
 | `sqlens.mcp.*` | — | MCP 服务器设置，见上文 MCP 章节 |
