@@ -49,6 +49,7 @@ const DB_TYPES = [
   { value: 'postgresql', label: 'PostgreSQL', defaultPort: 5432 },
   { value: 'redis', label: 'Redis', defaultPort: 6379 },
   { value: 'sqlite', label: 'SQLite', defaultPort: 0 },
+  { value: 'clickhouse', label: 'ClickHouse', defaultPort: 8123 },
 ];
 
 const SSL_MODES = [

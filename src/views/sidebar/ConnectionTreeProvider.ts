@@ -23,6 +23,7 @@ const DB_BRAND_COLOR: Record<DatabaseType, vscode.ThemeColor> = {
   [DatabaseType.MongoDB]: new vscode.ThemeColor('charts.green'),
   [DatabaseType.MSSQL]: new vscode.ThemeColor('charts.red'),
   [DatabaseType.MariaDB]: new vscode.ThemeColor('charts.orange'),
+  [DatabaseType.ClickHouse]: new vscode.ThemeColor('charts.yellow'),
 };
 /** Dim grey for inactive databases / disconnected connections (theme token, not raw hex). */
 const ICON_GREY = new vscode.ThemeColor('descriptionForeground');
@@ -216,6 +217,7 @@ export class DatabaseItem extends vscode.TreeItem {
 const BRAND_LABEL_TOKENS: Record<string, string> = {
   mysql: 'charts.blue',
   mariadb: 'charts.orange',
+  clickhouse: 'charts.yellow',
   postgresql: 'terminal.ansiBlue',
   sqlite: 'terminal.ansiCyan',
   redis: 'charts.red',

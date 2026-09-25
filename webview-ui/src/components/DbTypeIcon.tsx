@@ -22,7 +22,7 @@ const BRAND: Record<string, { d: string; color: string }> = {
 
 /** Brand colour per database type (used for icons and for active tab labels). */
 export function dbBrandColor(type: string): string | undefined {
-  return BRAND[type]?.color;
+  return BRAND[type]?.color ?? LABEL_COLORS[type];
 }
 
 /**
@@ -39,6 +39,7 @@ const LABEL_COLORS: Record<string, string> = {
   mongodb: '#5ec25f',
   elasticsearch: '#FEC514',
   mssql: '#e35a58',
+  clickhouse: '#FFCB14',
 };
 
 export function dbLabelColor(type: string): string | undefined {
@@ -46,7 +47,7 @@ export function dbLabelColor(type: string): string | undefined {
 }
 
 // Types that have a dedicated SVG file under resources/icons/ (db-<type>.svg).
-const SVG_FILE_TYPES = ['mysql', 'mariadb', 'postgresql', 'redis', 'sqlite'];
+const SVG_FILE_TYPES = ['mysql', 'mariadb', 'postgresql', 'redis', 'sqlite', 'clickhouse'];
 
 export default function DbTypeIcon({ type, size = 14 }: DbTypeIconProps) {
   const mediaBase: string =

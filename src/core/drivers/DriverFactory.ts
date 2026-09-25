@@ -3,6 +3,7 @@ import { MySQLDriver } from './MySQLDriver';
 import { PostgreSQLDriver } from './PostgreSQLDriver';
 import { SQLiteDriver } from './SQLiteDriver';
 import { RedisDriver } from './RedisDriver';
+import { ClickHouseDriver } from './ClickHouseDriver';
 import { DatabaseType } from '../types';
 
 /**
@@ -16,6 +17,7 @@ export class DriverFactory {
     [DatabaseType.PostgreSQL]: PostgreSQLDriver,
     [DatabaseType.SQLite]: SQLiteDriver,
     [DatabaseType.Redis]: RedisDriver,
+    [DatabaseType.ClickHouse]: ClickHouseDriver,
   };
 
   static createDriver(type: DatabaseType): DatabaseDriver {

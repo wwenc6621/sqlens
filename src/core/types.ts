@@ -11,6 +11,7 @@ export enum DatabaseType {
   MongoDB = 'mongodb',
   MSSQL = 'mssql',
   MariaDB = 'mariadb',
+  ClickHouse = 'clickhouse',
 }
 
 export enum SSLMode {
@@ -311,6 +312,7 @@ export function createDefaultConnectionConfig(type: DatabaseType): ConnectionCon
     [DatabaseType.MongoDB]: { host: '127.0.0.1', port: 27017, username: '' },
     [DatabaseType.MSSQL]: { host: '127.0.0.1', port: 1433, username: 'sa' },
     [DatabaseType.MariaDB]: { host: '127.0.0.1', port: 3306, username: 'root' },
+    [DatabaseType.ClickHouse]: { host: '127.0.0.1', port: 8123, username: 'default' },
   };
 
   const now = Date.now();
@@ -341,4 +343,5 @@ export const DATABASE_TYPE_META: Record<DatabaseType, { label: string; icon: str
   [DatabaseType.MongoDB]: { label: 'MongoDB', icon: '$(database)', defaultPort: 27017 },
   [DatabaseType.MSSQL]: { label: 'SQL Server', icon: '$(database)', defaultPort: 1433 },
   [DatabaseType.MariaDB]: { label: 'MariaDB', icon: '$(database)', defaultPort: 3306 },
+  [DatabaseType.ClickHouse]: { label: 'ClickHouse', icon: '$(database)', defaultPort: 8123 },
 };

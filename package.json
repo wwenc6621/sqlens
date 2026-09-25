@@ -2,7 +2,7 @@
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
   "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
@@ -944,8 +944,21 @@
         },
         "sqlens.redis.blockedCommands": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["FLUSHALL", "FLUSHDB", "SHUTDOWN", "CONFIG", "DEBUG", "KEYS", "MIGRATE", "SLAVEOF", "REPLICAOF", "MONITOR"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "FLUSHALL",
+            "FLUSHDB",
+            "SHUTDOWN",
+            "CONFIG",
+            "DEBUG",
+            "KEYS",
+            "MIGRATE",
+            "SLAVEOF",
+            "REPLICAOF",
+            "MONITOR"
+          ],
           "description": "%Additional Redis commands to block from execution (danger commands are always blocked)%"
         }
       }
@@ -953,8 +966,13 @@
     "languages": [
       {
         "id": "redis",
-        "aliases": ["Redis", "redis"],
-        "extensions": [".redis"]
+        "aliases": [
+          "Redis",
+          "redis"
+        ],
+        "extensions": [
+          ".redis"
+        ]
       }
     ]
   },
@@ -973,6 +991,7 @@
     "publish": "vsce publish"
   },
   "dependencies": {
+    "@clickhouse/client": "^1.23.1",
     "@modelcontextprotocol/sdk": "^1.30.1",
     "ioredis": "^5.11.1",
     "mysql2": "^3.11.0",

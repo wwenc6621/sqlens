@@ -245,7 +245,13 @@ export default function PanelHost() {
       <div className="panel-host-body">
         {tabs.length === 0 && (
           <div className="panel-host-empty">
-            <Icon name="database" size={40} strokeWidth={1.2} />
+            <img
+              src={`${(typeof window !== 'undefined' && (window as any).__MEDIA_BASE__) || ''}/logo.svg`}
+              width={96}
+              height={96}
+              alt=""
+              style={{ display: 'block', margin: '0 auto 8px', objectFit: 'contain', opacity: 0.9 }}
+            />
             <h3>{t('Nothing open yet')}</h3>
             <p className="text-muted">{t('Double-click a table in the Schema view, or run a query.')}</p>
           </div>

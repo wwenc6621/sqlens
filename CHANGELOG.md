@@ -2,6 +2,20 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.2.0 (2026-09-25)
+
+### ClickHouse support (P1)
+
+- New **ClickHouse** database type (HTTP protocol via the official `@clickhouse/client`, default port 8123): connect, test connection, database/table tree, SQL editor, and a read-only result grid.
+- ClickHouse-specific introspection via `system.databases` / `system.tables` / `system.columns` (no `information_schema`); no schema layer and no foreign keys; the "primary key" reported is the engine's sorting key (`ORDER BY`).
+- Rich type mapping for the grid: `Array` / `Map` / `Tuple` / `Nested` arrive as native JSON values, `Nullable` marks columns nullable, `Bool` / `Date` / `DateTime64` / `Enum` / `UUID` / `IPv4` / `IPv6` / `LowCardinality` all normalize correctly.
+- Writes (`INSERT` / `CREATE` / `ALTER ... UPDATE|DELETE` mutations / etc.) run through the command path and report affected rows, with a reminder that mutations are asynchronous in ClickHouse.
+- Brand icon and yellow label colour in the connection form, sidebar, and webview; ClickHouse added to the MCP connection types.
+
+### Sidebar icons
+
+- Replaced the per-type tinted cylinder SVGs (`dbnode-*.svg`, `database-green.svg`, `database-grey.svg`, `file-green.svg`) with the built-in `$(database)` / `$(file)` codicons tinted by theme colour tokens via `vscode.ThemeIcon` — active databases render in the type's brand colour, inactive ones in grey (same glyph). A shared connection-icon helper makes the Connections and Saved SQL views show identical icons per connection.
+
 ## 0.1.7 (2026-09-25)
 
 ### Sidebar icons
