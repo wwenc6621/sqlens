@@ -2,6 +2,17 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.3.2 (2026-09-26)
+
+### Fixed
+
+- **MCP server returned `500 {"error":"Internal error"}` for every request** — `explain_query` ended up registered twice, so building the MCP server threw and no tool could be called (clients showed "0 tools"). The duplicate registration is gone and the server answers `initialize` / `tools/list` normally. The stateless transport still answers `405` to the client's SSE probe, which is correct.
+
+### Testing
+
+- Added **MCP smoke tests** (`tests/mcp.test.ts`): boot the real HTTP server with a stubbed host, then assert `initialize` succeeds, every tool name is unique, and requests without the bearer token get `401`. This runs in `npm run test:unit` and in CI, so a duplicated tool registration fails the build instead of silently disabling AI access.
+- Test bundles (`dist-tests/`) are git-ignored and excluded from the VSIX.
+
 ## 0.3.1 (2026-09-26)
 
 ### Testing & CI

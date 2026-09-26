@@ -714,26 +714,6 @@ export class McpService {
       },
     );
 
-    // ── explain_query ──
-    mcp.tool(
-      'explain_query',
-      'Get the execution plan (EXPLAIN) for a read-only SQL statement.',
-      {
-        connectionId: z.string().optional().describe('Connection id from list_connections.'),
-        sql: z.string().describe('The SQL statement to explain.'),
-      },
-      async (args) => {
-        const result = await withActivity('explain_query', args, async () => {
-          const conn = await this.getDriver(args.connectionId);
-          const guard = this.guard.validate(args.sql, { readOnly: true, allowWrite: false });
-          if (!guard.ok) { throw new Error(guard.reason); }
-          const plan = await conn.driver.query(`EXPLAIN ${guard.statements![0]}`);
-          return { plan: plan.rows };
-        }, { sql: args.sql, connectionId: args?.connectionId });
-        return textResult(result);
-      },
-    );
-
     return mcp;
   }
 }
