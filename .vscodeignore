@@ -1,5 +1,9 @@
 .vscode/**
 .vscode-test/**
+.github/**
+scripts/**
+tests/**
+dist-tests/**
 src/**
 webview-ui/src/**
 webview-ui/node_modules/**
