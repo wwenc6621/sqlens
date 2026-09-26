@@ -24,6 +24,7 @@ const DB_BRAND_COLOR: Record<DatabaseType, vscode.ThemeColor> = {
   [DatabaseType.MSSQL]: new vscode.ThemeColor('charts.red'),
   [DatabaseType.MariaDB]: new vscode.ThemeColor('charts.orange'),
   [DatabaseType.ClickHouse]: new vscode.ThemeColor('charts.yellow'),
+  [DatabaseType.Elasticsearch]: new vscode.ThemeColor('terminal.ansiYellow'),
 };
 /** Dim grey for inactive databases / disconnected connections (theme token, not raw hex). */
 const ICON_GREY = new vscode.ThemeColor('descriptionForeground');
@@ -118,16 +119,26 @@ export class ConnectionItem extends vscode.TreeItem {
     } else {
       this.contextValue = connected ? 'connection-connected' : 'connection-disconnected';
     }
-    // Tag Redis connections so context menus can offer Redis-only actions.
-    if (config.type === DatabaseType.Redis) {
-      this.contextValue += ':redis';
-    }
+    // Tag the driver type so context menus can offer per-type actions and
+    // hide relational-only commands (ER diagram, structure editing, ...) on
+    // non-relational connections.
+    this.contextValue += `:${config.type}`;
 
-    this.command = {
-      command: connected ? 'sqlens.selectConnection' : 'sqlens.connect',
-      title: connected ? t('Select Connection') : t('Connect'),
-      arguments: [config.id],
-    };
+    // Disconnected rows connect on double click: the row command records the
+    // click and connects only when clicked twice quickly (see
+    // sqlens.connectionRowClick in extension.ts). Connected rows keep the
+    // single-click "select as active connection" behaviour.
+    this.command = connected
+      ? {
+          command: 'sqlens.selectConnection',
+          title: t('Select Connection'),
+          arguments: [config.id],
+        }
+      : {
+          command: 'sqlens.connectionRowClick',
+          title: t('Connect'),
+          arguments: [config.id],
+        };
   }
 
   private buildTooltip(config: ConnectionConfig, connected: boolean, typeLabel: string): vscode.MarkdownString {
@@ -187,8 +198,10 @@ export class DatabaseItem extends vscode.TreeItem {
       // Inactive: same codicon, dimmed to grey.
       this.iconPath = new vscode.ThemeIcon('database', ICON_GREY);
     }
-    // The existing database commands match on these context values.
-    this.contextValue = isActive ? 'database-active' : 'database';
+    // The existing database commands match on these context values; the type
+    // suffix lets relational-only actions (ER diagram, SQL dump) be hidden on
+    // document/columnar/key-value connections.
+    this.contextValue = `${isActive ? 'database-active' : 'database'}:${dbType ?? ''}`;
     this.description = isActive ? 'active' : '';
     this.tooltip = isActive ? `${dbName} (active database)` : `Switch to ${dbName}`;
 

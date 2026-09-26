@@ -251,6 +251,7 @@ export default function PanelHost() {
               height={96}
               alt=""
               style={{ display: 'block', margin: '0 auto 8px', objectFit: 'contain', opacity: 0.9 }}
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             />
             <h3>{t('Nothing open yet')}</h3>
             <p className="text-muted">{t('Double-click a table in the Schema view, or run a query.')}</p>

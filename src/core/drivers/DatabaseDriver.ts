@@ -10,6 +10,26 @@ import {
   ServerInfo,
 } from '../types';
 
+/** A row the grid changed, as sent by the webview. */
+export interface RowEdit {
+  status: 'modified' | 'added' | 'deleted' | 'unchanged';
+  data: unknown[];
+  original: unknown[];
+  changedCols: number[];
+}
+
+/**
+ * Optional editing capability for drivers where SQL DML cannot express the
+ * update (Elasticsearch documents, MongoDB $set, ClickHouse mutations).
+ * Implemented by those drivers; the SQL family keeps the generated-DML path.
+ */
+export interface RowEditCapable {
+  /** Apply the changes; returns how many were applied. */
+  applyRowEdits(table: string, rows: RowEdit[], columns: string[], pkColumns: string[], schema?: string): Promise<number>;
+  /** Driver-syntax text that loads one page for the grid. */
+  pageQuery(table: string, limit: number, schema?: string, offset?: number): string;
+}
+
 /**
  * Abstract database driver interface.
  * All database-specific drivers must implement this interface.

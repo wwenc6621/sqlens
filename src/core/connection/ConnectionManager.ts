@@ -13,6 +13,20 @@ interface ActiveConnection {
   tunnel?: TunnelInfo;
 }
 
+/** Drivers with a relational model (ER diagram, structure editing, SQL dump). */
+const RELATIONAL_DRIVERS: string[] = [
+  DatabaseType.MySQL, DatabaseType.MariaDB, DatabaseType.PostgreSQL,
+  DatabaseType.SQLite, DatabaseType.MSSQL,
+];
+
+/** Drivers that support an EXPLAIN-style query plan or profile. */
+const EXPLAIN_DRIVERS: string[] = [
+  ...RELATIONAL_DRIVERS,
+  DatabaseType.ClickHouse,   // EXPLAIN <query>
+  DatabaseType.MongoDB,      // cursor.explain()
+  DatabaseType.Elasticsearch, // _search?profile=true
+];
+
 /**
  * Central manager for all database connections.
  * Handles connection lifecycle, driver creation, SSH tunneling, and events.
@@ -238,6 +252,17 @@ export class ConnectionManager {
   setActiveConnection(id: string | undefined): void {
     this._activeConnectionId = id;
     vscode.commands.executeCommand('setContext', 'sqlens.hasActiveConnection', !!id);
+
+    // Expose the active driver's family so menus can hide relational-only
+    // actions (ER diagram, structure editing, SQL dump) on document/columnar/
+    // key-value connections.
+    const type = id ? this.connections.get(id)?.config.type : undefined;
+    const relational = !!type && RELATIONAL_DRIVERS.includes(type);
+    const explains = !!type && EXPLAIN_DRIVERS.includes(type);
+    vscode.commands.executeCommand('setContext', 'sqlens.activeDriverRelational', relational);
+    vscode.commands.executeCommand('setContext', 'sqlens.activeDriverExplains', explains);
+    vscode.commands.executeCommand('setContext', 'sqlens.activeDriverType', type ?? '');
+
     this._onActiveConnectionChanged.fire(id);
   }
 

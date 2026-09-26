@@ -47,7 +47,7 @@ export function dbLabelColor(type: string): string | undefined {
 }
 
 // Types that have a dedicated SVG file under resources/icons/ (db-<type>.svg).
-const SVG_FILE_TYPES = ['mysql', 'mariadb', 'postgresql', 'redis', 'sqlite', 'clickhouse'];
+const SVG_FILE_TYPES = ['mysql', 'mariadb', 'postgresql', 'redis', 'sqlite', 'clickhouse', 'elasticsearch', 'mongodb', 'mssql'];
 
 export default function DbTypeIcon({ type, size = 14 }: DbTypeIconProps) {
   const mediaBase: string =

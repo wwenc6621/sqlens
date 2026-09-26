@@ -9,9 +9,12 @@ Sqlens 是一个完全免费的 VS Code 扩展，用于浏览数据库、运行 
 ## 功能
 
 - 在 Sqlens 侧边栏管理数据库连接。
-- 连接 MySQL、PostgreSQL、SQLite 数据库。
+- 连接 MySQL / MariaDB、PostgreSQL、SQLite 数据库。
+- 连接 ClickHouse（列式，HTTP 8123）、Elasticsearch（REST 请求编辑器）、MongoDB（mongosh 风格命令）、SQL Server（T-SQL）数据库。
 - 连接 Redis 数据库（standalone / cluster / sentinel，支持 SSH 隧道与 TLS）。
 - 内置 SQLite 查看器，直接打开 `.db`、`.sqlite`、`.sqlite3` 文件。
+- 连接配置可导出/导入为 JSON 文件（默认不含密码，可选明文并二次确认），方便换机迁移。
+- 双击侧边栏中未连接的连接即可连接（单击仅选中）。
 - 浏览库、表、视图、列、索引、外键。
 - 可编辑数据表格（排序、筛选、分页、行内编辑）。
 - 在 `.sql` 文件中通过 CodeLens 运行查询，支持按文件选择连接和数据库上下文。
@@ -32,6 +35,10 @@ Sqlens 是一个完全免费的 VS Code 扩展，用于浏览数据库、运行 
 | PostgreSQL | 已支持 |
 | SQLite | 通过 `sql.js` 支持 |
 | Redis | 已支持（standalone / cluster / sentinel，ioredis） |
+| ClickHouse | 已支持（`@clickhouse/client`；复杂类型、mutation 编辑可选开启、`FORMAT` 导出） |
+| Elasticsearch | 已支持（8.x；索引/字段树、REST 请求编辑器、NDJSON 导入导出、聚合条形展示） |
+| MongoDB | 已支持（官方驱动；mongosh 风格查询、文档 CRUD、JSON 导入导出、`_id` 游标深分页） |
+| SQL Server | 已支持（T-SQL；`OFFSET/FETCH` 分页、多结果集页签、`bcp` 高速导出、NTLM/Azure AD 认证） |
 
 ## 快速开始
 

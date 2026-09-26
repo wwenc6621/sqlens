@@ -3,4 +3,7 @@ export { MySQLDriver } from './MySQLDriver';
 export { PostgreSQLDriver } from './PostgreSQLDriver';
 export { SQLiteDriver } from './SQLiteDriver';
 export { ClickHouseDriver, normalizeClickHouseType } from './ClickHouseDriver';
+export { ElasticsearchDriver, normalizeEsType } from './ElasticsearchDriver';
+export { MongoDBDriver } from './MongoDBDriver';
+export { MSSQLDriver, normalizeSqlType } from './MSSQLDriver';
 export { DriverFactory } from './DriverFactory';

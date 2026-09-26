@@ -110,6 +110,10 @@ export class QueryResultsViewProvider implements vscode.WebviewViewProvider {
     const styleUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'index.css')
     );
+    // Icon base for the webview (brand logos, the welcome-view logo).
+    const mediaBase = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, 'resources/icons')
+    );
 
     const nonce = this.getNonce();
 
@@ -133,6 +137,7 @@ export class QueryResultsViewProvider implements vscode.WebviewViewProvider {
   <script nonce="${nonce}">
     window.__PANEL_TYPE__ = "dataGrid";
     window.__LOCALE__ = ${JSON.stringify(vscode.env.language || 'en')};
+    window.__MEDIA_BASE__ = "${mediaBase.toString()}";
   </script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

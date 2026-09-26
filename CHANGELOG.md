@@ -2,6 +2,47 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.3.0 (2026-09-26)
+
+### Fixed
+
+- **Extension failed to load when the Elasticsearch driver was bundled** — `@elastic/elasticsearch` require its optional `apache-arrow/Arrow.node` binding at module load, which the package does not ship, so the whole extension threw `MODULE_NOT_FOUND` and every view (including the connection list) came up empty. The bundler now aliases that specifier to an empty shim, and the ES client is loaded lazily on connect. Also fixed SQL Server table statistics (row count / size) being dropped because unnamed expression columns collapsed each other.
+
+### New database engines
+
+- **Elasticsearch** (official 8.x client): index tree, mapping field tree, Kibana-style request editor (`GET /index/_search` + JSON body, or a bare JSON body), read-only grid with `_id` first and dot-flattened `_source`; in-grid document editing (index/update/delete); deep-pagination guard for the `from + size` window.
+- **MongoDB** (official driver): database/collection tree, sampled field tree, mongosh-style editor (`db.coll.find({...}).sort().limit()`, `countDocuments`, `distinct`, `aggregate`, and full CRUD) parsed structurally — user JS is never evaluated; in-grid editing via `$set`/`insertOne`/`deleteOne`; BSON rendering (ObjectId hex, ISO dates, JSON cells) with value-preview truncation.
+- **SQL Server** (official `mssql`/tedious): T-SQL dialect (bracketed identifiers, `N''` literals, `OFFSET/FETCH` pagination, `GO` batch splitting), introspection via `sys.*` + `dm_db_partition_stats`, schema tree, read-only grid.
+- **ClickHouse** (P2 additions): `KILL QUERY` cancellation, data-skipping indices, in-grid mutation editing (opt-in), system-database hiding, per-value truncation.
+
+### MCP security
+
+- Statement classification is now **driver-aware** via a `StatementClassifier` registry: SQL family, Redis command tables, Elasticsearch method/path rules, MongoDB method rules, ClickHouse mutations and T-SQL danger commands (`TRUNCATE`, `xp_cmdshell`, `BULK INSERT`, ...). Unrecognised requests are treated conservatively.
+- `maxRows` maps to the driver's native cap: `LIMIT` (SQL/ClickHouse), `size` (Elasticsearch), `.limit()`/`$limit` (MongoDB); tool descriptions now document each driver's input syntax.
+
+### Engine-specific completeness (P2–P4)
+
+- **SQL Server**: TLS/auth switches in the connection form (encrypt, trust self-signed, Windows NTLM, Azure AD service principal), `IDENTITY_INSERT` when inserting an identity value, `SET STATISTICS PROFILE` for EXPLAIN, primary-key `ORDER BY` for stable OFFSET/FETCH paging, and multi-result-set batches (stored procedures / several SELECTs) open each additional result in its own read-only tab. Export supports the built-in T-SQL INSERT script (with CREATE TABLE) and a high-speed `bcp` export with a clear install hint when the tools are missing.
+- **Elasticsearch**: index create/delete, NDJSON export/import, `profile: true` EXPLAIN, aggregation responses rendered as one row per bucket with a text bar column, Elastic Cloud ID support, driver-side paging that switches to a `search_after` cursor once the `from + size` window is exceeded (deep jumps are guided).
+- **MongoDB**: collection create, index create, JSON export/import, `cursor.explain()`, connection-string (Atlas SRV) field, gated mongosh passthrough (stats/listIndexes/validate/drop/renameCollection), and paging that switches from skip/limit to a fast `_id` range cursor when paging forward past the deep-skip threshold.
+- **ClickHouse**: `FORMAT` export (CSV/TSV/JSONEachRow/JSON/PrettyCompact), sorting-key `ORDER BY` for stable paging.
+- **Grid paging** now uses each driver's native query (from/size, skip/limit, OFFSET/FETCH, LIMIT/OFFSET) instead of generated SQL, so non-SQL tables can be browsed and paged.
+- **Formatting** is dialect-aware (T-SQL / PostgreSQL / MySQL) and falls back to JSON formatting for Elasticsearch requests and mongosh calls.
+- **Views** are read-only nodes: rename/drop/truncate/structure menus no longer appear on them.
+- Registered `.es` and `.mongo` languages.
+
+### Settings
+
+- Added the full per-driver setting set: `sqlens.clickhouse.*` (stringMaxBytes, allowMutations, showSystemDatabase, requireOrderByPagination, useBackticks), `sqlens.es.*` (showSystemIndices, requestTimeout, maxResultWindow), `sqlens.mongo.*` (sampleSize, maxValuePreview, allowShellEval), `sqlens.mssql.*` (encrypt, trustServerCertificate, requestTimeout).
+
+### UI
+
+- The **MCP Server panel no longer opens automatically** on startup; use the title-bar button or the command palette when you need it (the AI Activity tab still opens on first AI activity).
+- Progressive tree loading for every driver that exposes a cheap name listing (system tables, `sys.tables`, `_cat/indices`, `listCollections`).
+- Relational-only actions (ER diagram, structure editing, DDL, SQL dump, EXPLAIN) are hidden on non-relational connections.
+- **Connection import/export**: export selected connections to JSON (passwords stripped by default; opt-in plaintext behind a modal warning) and import them back (id/name collision handling, machine-bound secrets dropped).
+- Double-click a disconnected connection to connect (single click only selects).
+
 ## 0.2.0 (2026-09-25)
 
 ### ClickHouse support (P1)

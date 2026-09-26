@@ -1,8 +1,8 @@
 {
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
-  "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
-  "version": "0.2.0",
+  "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis/ClickHouse/Elasticsearch/MongoDB/SQL Server connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
+  "version": "0.3.0",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
@@ -37,6 +37,9 @@
     "sqlite",
     "redis",
     "mongodb",
+    "clickhouse",
+    "elasticsearch",
+    "sql server",
     "query",
     "data"
   ],
@@ -370,6 +373,18 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "sqlens.exportConnections",
+        "title": "%Export Connections%",
+        "category": "%Sqlens%",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "sqlens.importConnections",
+        "title": "%Import Connections%",
+        "category": "%Sqlens%",
+        "icon": "$(cloud-upload)"
+      },
+      {
         "command": "sqlens.refreshSchema",
         "title": "%Refresh Schema%",
         "category": "%Sqlens%",
@@ -527,6 +542,61 @@
         "command": "sqlens.redisImport",
         "title": "%Redis: Import from JSON%",
         "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.esCreateIndex",
+        "title": "%Elasticsearch: Create Index...%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.esDeleteIndex",
+        "title": "%Elasticsearch: Delete Index...%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.esExport",
+        "title": "%Elasticsearch: Export Index to NDJSON...%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.esImport",
+        "title": "%Elasticsearch: Import NDJSON...%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.mongoCreateCollection",
+        "title": "%MongoDB: Create Collection...%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.mongoCreateIndex",
+        "title": "%MongoDB: Create Index...%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.mongoExport",
+        "title": "%MongoDB: Export Collection to JSON...%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.mongoImport",
+        "title": "%MongoDB: Import JSON...%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.mongoShell",
+        "title": "%MongoDB: mongosh Passthrough...%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.clickhouseExport",
+        "title": "%ClickHouse: Export Table (FORMAT)...%",
+        "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.mssqlBcpExport",
+        "title": "%SQL Server: High-speed Export (bcp)...%",
+        "category": "%Sqlens%"
       }
     ],
     "menus": {
@@ -552,6 +622,16 @@
           "group": "navigation"
         },
         {
+          "command": "sqlens.exportConnections",
+          "when": "view == sqlens.connections",
+          "group": "navigation@8"
+        },
+        {
+          "command": "sqlens.importConnections",
+          "when": "view == sqlens.connections",
+          "group": "navigation@8"
+        },
+        {
           "command": "sqlens.newQuery",
           "when": "view == sqlens.connections && sqlens.hasActiveConnection",
           "group": "navigation"
@@ -563,7 +643,7 @@
         },
         {
           "command": "sqlens.createTable",
-          "when": "view == sqlens.schema && sqlens.hasActiveConnection",
+          "when": "view == sqlens.schema && sqlens.hasActiveConnection && sqlens.activeDriverRelational",
           "group": "navigation"
         },
         {
@@ -661,23 +741,78 @@
         },
         {
           "command": "sqlens.erDiagram",
-          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem !~ /redis/",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem !~ /(redis|clickhouse|elasticsearch|mongodb)/",
           "group": "2_query@2"
         },
         {
           "command": "sqlens.openTerminal",
-          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem !~ /redis/",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem !~ /(redis|clickhouse|elasticsearch|mongodb)/",
           "group": "2_query@3"
         },
         {
           "command": "sqlens.createDatabase",
-          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem !~ /redis/",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem !~ /(redis|clickhouse|elasticsearch|mongodb)/",
           "group": "2_query@4"
         },
         {
           "command": "sqlens.deleteConnection",
           "when": "view == sqlens.connections && viewItem =~ /^connection/",
           "group": "3_danger@1"
+        },
+        {
+          "command": "sqlens.esCreateIndex",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /elasticsearch/",
+          "group": "1_manage@3"
+        },
+        {
+          "command": "sqlens.esDeleteIndex",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /elasticsearch/",
+          "group": "1_manage@4"
+        },
+        {
+          "command": "sqlens.esExport",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /elasticsearch/",
+          "group": "1_manage@5"
+        },
+        {
+          "command": "sqlens.esImport",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /elasticsearch/",
+          "group": "1_manage@6"
+        },
+        {
+          "command": "sqlens.mongoCreateCollection",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mongodb/",
+          "group": "1_manage@3"
+        },
+        {
+          "command": "sqlens.mongoCreateIndex",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mongodb/",
+          "group": "1_manage@4"
+        },
+        {
+          "command": "sqlens.mongoExport",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mongodb/",
+          "group": "1_manage@5"
+        },
+        {
+          "command": "sqlens.mongoImport",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mongodb/",
+          "group": "1_manage@6"
+        },
+        {
+          "command": "sqlens.mongoShell",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mongodb/",
+          "group": "1_manage@7"
+        },
+        {
+          "command": "sqlens.clickhouseExport",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /clickhouse/",
+          "group": "1_manage@3"
+        },
+        {
+          "command": "sqlens.mssqlBcpExport",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mssql/",
+          "group": "1_manage@3"
         },
         {
           "command": "sqlens.redisExport",
@@ -701,32 +836,32 @@
         },
         {
           "command": "sqlens.dumpDatabase",
-          "when": "view == sqlens.connections && viewItem =~ /^database/",
+          "when": "view == sqlens.connections && viewItem =~ /^database/ && viewItem !~ /(redis|clickhouse|elasticsearch|mongodb)/",
           "group": "1_actions@2"
         },
         {
           "command": "sqlens.importDatabase",
-          "when": "view == sqlens.connections && viewItem =~ /^database/",
+          "when": "view == sqlens.connections && viewItem =~ /^database/ && viewItem !~ /(redis|clickhouse|elasticsearch|mongodb)/",
           "group": "1_actions@3"
         },
         {
           "command": "sqlens.erDiagram",
-          "when": "view == sqlens.connections && viewItem =~ /^database/",
+          "when": "view == sqlens.connections && viewItem =~ /^database/ && viewItem !~ /(redis|clickhouse|elasticsearch|mongodb)/",
           "group": "2_query@1"
         },
         {
           "command": "sqlens.openTable",
-          "when": "view == sqlens.schema && viewItem == table",
+          "when": "view == sqlens.schema && viewItem =~ /^(table|view)$/",
           "group": "inline"
         },
         {
           "command": "sqlens.openStructure",
-          "when": "view == sqlens.schema && viewItem == table",
+          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
           "group": "1_view@1"
         },
         {
           "command": "sqlens.showDDL",
-          "when": "view == sqlens.schema && viewItem == table",
+          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
           "group": "1_view@2"
         },
         {
@@ -736,7 +871,7 @@
         },
         {
           "command": "sqlens.renameTable",
-          "when": "view == sqlens.schema && viewItem == table",
+          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
           "group": "2_actions@3"
         },
         {
@@ -751,12 +886,12 @@
         },
         {
           "command": "sqlens.truncateTable",
-          "when": "view == sqlens.schema && viewItem == table",
+          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
           "group": "3_danger@1"
         },
         {
           "command": "sqlens.dropTable",
-          "when": "view == sqlens.schema && viewItem == table",
+          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
           "group": "3_danger@2"
         }
       ],
@@ -775,7 +910,7 @@
       "editor/context": [
         {
           "command": "sqlens.explainPlan",
-          "when": "resourceLangId == sql",
+          "when": "resourceLangId == sql && sqlens.activeDriverExplains",
           "group": "sqlens@1"
         }
       ]
@@ -960,6 +1095,76 @@
             "MONITOR"
           ],
           "description": "%Additional Redis commands to block from execution (danger commands are always blocked)%"
+        },
+        "sqlens.clickhouse.stringMaxBytes": {
+          "type": "number",
+          "default": 512,
+          "description": "%Maximum number of bytes to preview for a ClickHouse String value in the grid%"
+        },
+        "sqlens.clickhouse.allowMutations": {
+          "type": "boolean",
+          "default": false,
+          "description": "%Allow in-grid mutation edits (ALTER TABLE ... UPDATE/DELETE) for ClickHouse connections%"
+        },
+        "sqlens.clickhouse.showSystemDatabase": {
+          "type": "boolean",
+          "default": false,
+          "description": "%Show ClickHouse system databases in the schema tree%"
+        },
+        "sqlens.clickhouse.requireOrderByPagination": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Add ORDER BY (sorting key) to ClickHouse pagination queries for stable pages%"
+        },
+        "sqlens.clickhouse.useBackticks": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Quote ClickHouse identifiers with backticks (disable to use ANSI double quotes)%"
+        },
+        "sqlens.es.showSystemIndices": {
+          "type": "boolean",
+          "default": false,
+          "description": "%Show Elasticsearch system indices (names starting with a dot)%"
+        },
+        "sqlens.es.requestTimeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "%Elasticsearch request timeout in milliseconds%"
+        },
+        "sqlens.es.maxResultWindow": {
+          "type": "number",
+          "default": 10000,
+          "description": "%Elasticsearch from + size result window; larger requests must use search_after%"
+        },
+        "sqlens.mongo.sampleSize": {
+          "type": "number",
+          "default": 100,
+          "description": "%Number of MongoDB documents sampled to infer collection fields%"
+        },
+        "sqlens.mongo.maxValuePreview": {
+          "type": "number",
+          "default": 512,
+          "description": "%Maximum number of bytes to preview for a MongoDB value in the grid%"
+        },
+        "sqlens.mongo.allowShellEval": {
+          "type": "boolean",
+          "default": false,
+          "description": "%Allow full mongosh passthrough for MongoDB (not recommended)%"
+        },
+        "sqlens.mssql.encrypt": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Encrypt SQL Server connections (required by Azure SQL)%"
+        },
+        "sqlens.mssql.trustServerCertificate": {
+          "type": "boolean",
+          "default": false,
+          "description": "%Trust self-signed certificates for SQL Server connections%"
+        },
+        "sqlens.mssql.requestTimeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "%SQL Server query timeout in milliseconds%"
         }
       }
     },
@@ -973,13 +1178,33 @@
         "extensions": [
           ".redis"
         ]
+      },
+      {
+        "id": "es",
+        "aliases": [
+          "Elasticsearch",
+          "elasticsearch"
+        ],
+        "extensions": [
+          ".es"
+        ]
+      },
+      {
+        "id": "mongo",
+        "aliases": [
+          "MongoDB",
+          "mongodb"
+        ],
+        "extensions": [
+          ".mongo"
+        ]
       }
     ]
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
     "build": "npm run build:ext && npm run build:webview",
-    "build:ext": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --external:better-sqlite3 --external:sql.js --external:cpu-features --external:*.node --format=cjs --platform=node --target=node20",
+    "build:ext": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --external:better-sqlite3 --external:sql.js --external:cpu-features --external:*.node --alias:apache-arrow/Arrow.node=./src/shims/apache-arrow.ts --format=cjs --platform=node --target=node20",
     "build:webview": "cd webview-ui && npm run build",
     "watch": "npm run build:ext -- --watch --sourcemap",
     "dev": "concurrently \"npm run watch\" \"cd webview-ui && npm run dev\"",
@@ -992,8 +1217,11 @@
   },
   "dependencies": {
     "@clickhouse/client": "^1.23.1",
+    "@elastic/elasticsearch": "^8.19.2",
     "@modelcontextprotocol/sdk": "^1.30.1",
     "ioredis": "^5.11.1",
+    "mongodb": "^7.6.0",
+    "mssql": "^12.7.2",
     "mysql2": "^3.11.0",
     "pg": "^8.13.0",
     "sql-formatter": "^15.4.0",
@@ -1005,6 +1233,7 @@
   "devDependencies": {
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.6",
+    "@types/mssql": "^12.3.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
     "@types/ssh2": "^1.15.0",

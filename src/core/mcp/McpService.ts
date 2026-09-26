@@ -9,6 +9,7 @@ import type { DatabaseDriver } from '../drivers/DatabaseDriver';
 import { ConnectionManager } from '../connection/ConnectionManager';
 import { QueryHistory } from '../query/QueryHistory';
 import { SecurityGuard } from './SecurityGuard';
+import { isSqlFamily } from './StatementClassifiers';
 import { ActivityBridge } from './ActivityBridge';
 import { Logger } from '../utils/Logger';
 
@@ -260,6 +261,45 @@ export class McpService {
     return `${sql.replace(/;\s*$/, '')} LIMIT ${maxRows}`;
   }
 
+  /**
+   * Enforce the row cap per driver: LIMIT for SQL dialects that support it,
+   * `size` for Elasticsearch search bodies, `.limit()` for mongosh find calls.
+   * MSSQL has no LIMIT syntax — its results are truncated after fetching.
+   */
+  private applyRowLimit(driverType: string | undefined, text: string, maxRows: number): string {
+    switch (driverType) {
+      case 'redis':
+        // maxRows maps to SCAN COUNT / collection command truncation.
+        return text;
+      case 'mongodb': {
+        if (!/\.\s*(find|findone)\s*\(/.test(text) || /\.\s*limit\s*\(/i.test(text)) { return text; }
+        return `${text.trim().replace(/\s*;?\s*$/, '')}.limit(${maxRows})`;
+      }
+      case 'elasticsearch': {
+        // Only search bodies are capped; other endpoints ignore size.
+        if (!/_search\b/.test(text)) { return text; }
+        const existing = /"size"\s*:\s*(\d+)/.exec(text);
+        if (existing) {
+          const capped = Math.min(Number(existing[1]) || maxRows, maxRows);
+          return text.replace(/"size"\s*:\s*\d+/, `"size": ${capped}`);
+        }
+        const bodyStart = text.indexOf('{');
+        if (bodyStart === -1) {
+          return `${text.trim()}\n{"size": ${maxRows}}`;
+        }
+        const header = text.slice(0, bodyStart);
+        const body = text.slice(bodyStart);
+        const injected = body.replace(/\{/, `{\n  "size": ${maxRows},`);
+        return `${header}${injected}`;
+      }
+      case 'mssql':
+        // No LIMIT in T-SQL; the caller truncates fetched rows.
+        return text;
+      default:
+        return this.ensureLimit(text, maxRows);
+    }
+  }
+
   /** Best-effort DDL string built from introspection data. */
   private buildDdl(driver: DatabaseDriver, table: string, columns: { name: string; type: string; nullable: boolean; default?: unknown }[], pk: string[]): string {
     const q = (n: string) => driver.escapeIdentifier(n);
@@ -383,10 +423,15 @@ export class McpService {
     // ── run_query ──
     mcp.tool(
       'run_query',
-      'Execute a single read-only statement. For SQL connections this is a SELECT/SHOW/DESCRIBE/EXPLAIN (a LIMIT is enforced automatically). For Redis connections this is a single read command (GET/HGETALL/SCAN/TYPE/TTL/...); one command per call.',
+      'Execute a single read-only request. The accepted text depends on the connection type (see list_connections): '
+      + 'SQL connections (mysql/mariadb/postgresql/sqlite/clickhouse/mssql) take a SELECT/SHOW/DESCRIBE/EXPLAIN (a row cap is enforced automatically); '
+      + 'redis takes one read command (GET/HGETALL/SCAN/TYPE/TTL/...); '
+      + 'elasticsearch takes a REST request which may be written as "GET /index/_search\\n{json body}" (a bare JSON body means a search); '
+      + 'mongodb takes a mongosh-style call such as db.collection.find({...}).limit(10). '
+      + 'Only one statement per call.',
       {
         connectionId: z.string().optional().describe('Connection id from list_connections.'),
-        sql: z.string().describe('A single read SQL statement.'),
+        sql: z.string().describe('A single read statement in the connection type\'s input syntax.'),
         maxRows: z.number().int().min(1).max(1000).optional().describe(`Max rows to return (default ${maxRowsDefault}).`),
       },
       async (args) => {
@@ -397,13 +442,17 @@ export class McpService {
             // maxRows maps to SCAN/collection COUNT for Redis reads.
             (conn.driver as any).setScanCount?.(Math.min(args.maxRows ?? maxRowsDefault, 1000));
           }
+          if (driverType === 'mongodb') {
+            // maxRows maps to the aggregation $limit stage / find limit.
+            (conn.driver as any).setRowLimit?.(Math.min(args.maxRows ?? maxRowsDefault, 1000));
+          }
           const guard = this.guard.validate(args.sql, { readOnly: true, allowWrite: false, driverType });
           if (!guard.ok) { throw new Error(guard.reason); }
-          const sql = driverType === 'redis' ? args.sql : guard.statements![0];
+          const sql = isSqlFamily(driverType) ? guard.statements![0] : args.sql;
           const touchedTable = this.guard.extractTable(sql);
           if (touchedTable) { this.revealTable?.(touchedTable, conn.id); }
           const maxRows = Math.min(args.maxRows ?? maxRowsDefault, 1000);
-          const limitSql = driverType === 'redis' ? sql : this.ensureLimit(sql, maxRows);
+          const limitSql = this.applyRowLimit(driverType, sql, maxRows);
 
           const start = performance.now();
           try {
@@ -442,10 +491,16 @@ export class McpService {
     // ── write_query ──
     mcp.tool(
       'write_query',
-      'Execute a single write statement (INSERT/UPDATE/DELETE). DDL/DROP/TRUNCATE are never allowed. UPDATE/DELETE must include a WHERE clause. May require user confirmation.',
+      'Execute a single write statement. Accepted per connection type: '
+      + 'SQL (mysql/mariadb/postgresql/sqlite/mssql) INSERT/UPDATE/DELETE with a WHERE clause; '
+      + 'clickhouse INSERT, or a bounded mutation `ALTER TABLE t UPDATE|DELETE ... WHERE ...` (asynchronous); '
+      + 'redis one write command (SET/HSET/LPUSH/EXPIRE/DEL/...); '
+      + 'elasticsearch PUT/POST to _doc/_update/_bulk/_index; '
+      + 'mongodb insertOne/insertMany/updateOne/updateMany/replaceOne/deleteOne/deleteMany. '
+      + 'DDL/DROP/TRUNCATE and destructive admin commands are never allowed. May require user confirmation.',
       {
         connectionId: z.string().optional().describe('Connection id from list_connections.'),
-        sql: z.string().describe('A single write SQL statement.'),
+        sql: z.string().describe('A single write statement in the connection type\'s input syntax.'),
       },
       async (args) => {
         if (readOnly) {
@@ -464,7 +519,7 @@ export class McpService {
           activity.recordBlocked('write_query', clientName, JSON.stringify(args), guard.reason!);
           return textResult({ ok: false, error: guard.reason }, true);
         }
-        const sql = driverType === 'redis' ? args.sql : guard.statements![0];
+        const sql = isSqlFamily(driverType) ? guard.statements![0] : args.sql;
 
         if (writeMode === 'confirm') {
           const conn = await this.connectionManager.getSavedConnections().then(cs => cs.find(c => c.id === args.connectionId));

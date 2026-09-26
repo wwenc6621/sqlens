@@ -4,6 +4,9 @@ import { PostgreSQLDriver } from './PostgreSQLDriver';
 import { SQLiteDriver } from './SQLiteDriver';
 import { RedisDriver } from './RedisDriver';
 import { ClickHouseDriver } from './ClickHouseDriver';
+import { ElasticsearchDriver } from './ElasticsearchDriver';
+import { MongoDBDriver } from './MongoDBDriver';
+import { MSSQLDriver } from './MSSQLDriver';
 import { DatabaseType } from '../types';
 
 /**
@@ -18,6 +21,9 @@ export class DriverFactory {
     [DatabaseType.SQLite]: SQLiteDriver,
     [DatabaseType.Redis]: RedisDriver,
     [DatabaseType.ClickHouse]: ClickHouseDriver,
+    [DatabaseType.Elasticsearch]: ElasticsearchDriver,
+    [DatabaseType.MongoDB]: MongoDBDriver,
+    [DatabaseType.MSSQL]: MSSQLDriver,
   };
 
   static createDriver(type: DatabaseType): DatabaseDriver {

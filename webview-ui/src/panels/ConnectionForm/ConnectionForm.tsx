@@ -50,6 +50,9 @@ const DB_TYPES = [
   { value: 'redis', label: 'Redis', defaultPort: 6379 },
   { value: 'sqlite', label: 'SQLite', defaultPort: 0 },
   { value: 'clickhouse', label: 'ClickHouse', defaultPort: 8123 },
+  { value: 'elasticsearch', label: 'Elasticsearch', defaultPort: 9200 },
+  { value: 'mongodb', label: 'MongoDB', defaultPort: 27017 },
+  { value: 'mssql', label: 'SQL Server', defaultPort: 1433 },
 ];
 
 const SSL_MODES = [
@@ -204,6 +207,9 @@ export default function ConnectionForm() {
 
   const isSQLite = form.type === 'sqlite';
   const isRedis = form.type === 'redis';
+  const isMSSQL = form.type === 'mssql';
+  const isMongo = form.type === 'mongodb';
+  const isElastic = form.type === 'elasticsearch';
   const redisMode = (form.options.redisMode as string) || 'standalone';
   const redisNodesText = ((form.options.redisNodes as string[]) || []).join('\n');
 
@@ -497,6 +503,113 @@ export default function ConnectionForm() {
                     placeholder={form.type === 'postgresql' ? 'postgres' : 'my_database'}
                   />
                 </div>
+
+                {isMSSQL && (
+                  <div className="form-field">
+                    <label>{t('SQL Server TLS')}</label>
+                    <label className="checkbox-wrapper">
+                      <input
+                        type="checkbox"
+                        checked={form.options.encrypt !== false}
+                        onChange={e => updateOption('encrypt', e.target.checked)}
+                      />
+                      <span>{t('Encrypt connection (required by Azure SQL)')}</span>
+                    </label>
+                    <label className="checkbox-wrapper">
+                      <input
+                        type="checkbox"
+                        checked={form.options.trustServerCertificate === true}
+                        onChange={e => updateOption('trustServerCertificate', e.target.checked)}
+                      />
+                      <span>{t('Trust server certificate (self-signed)')}</span>
+                    </label>
+                  </div>
+                )}
+
+                {isMSSQL && (
+                  <>
+                    <div className="form-field">
+                      <label>{t('Authentication')}</label>
+                      <select
+                        value={(form.options.authentication as string) || 'sql'}
+                        onChange={e => updateOption('authentication', e.target.value === 'sql' ? undefined : e.target.value)}
+                      >
+                        <option value="sql">{t('SQL Server Authentication')}</option>
+                        <option value="ntlm">{t('Windows (NTLM)')}</option>
+                        <option value="azure-active-directory-service-principal-secret">{t('Azure AD (service principal)')}</option>
+                      </select>
+                    </div>
+
+                    {form.options.authentication === 'ntlm' && (
+                      <div className="form-field">
+                        <label>{t('Domain')}</label>
+                        <input
+                          type="text"
+                          value={(form.options.domain as string) || ''}
+                          onChange={e => updateOption('domain', e.target.value)}
+                          placeholder="MYDOMAIN"
+                        />
+                      </div>
+                    )}
+
+                    {String(form.options.authentication || '').startsWith('azure-active-directory') && (
+                      <>
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>{t('Client ID')}</label>
+                            <input
+                              type="text"
+                              value={(form.options.clientId as string) || ''}
+                              onChange={e => updateOption('clientId', e.target.value)}
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label>{t('Tenant ID')}</label>
+                            <input
+                              type="text"
+                              value={(form.options.tenantId as string) || ''}
+                              onChange={e => updateOption('tenantId', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="form-field">
+                          <label>{t('Client Secret')}</label>
+                          <input
+                            type="password"
+                            value={(form.options.clientSecret as string) || ''}
+                            onChange={e => updateOption('clientSecret', e.target.value)}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {isElastic && (
+                  <div className="form-field">
+                    <label>{t('Cloud ID (optional)')}</label>
+                    <input
+                      type="text"
+                      value={(form.options.cloudId as string) || ''}
+                      onChange={e => updateOption('cloudId', e.target.value)}
+                      placeholder="deployment:base64..."
+                    />
+                    <p className="form-hint">{t('Elastic Cloud deployment id; replaces host/port.')}</p>
+                  </div>
+                )}
+
+                {isMongo && (
+                  <div className="form-field">
+                    <label>{t('Connection String (optional)')}</label>
+                    <input
+                      type="text"
+                      value={(form.options.connectionString as string) || ''}
+                      onChange={e => updateOption('connectionString', e.target.value)}
+                      placeholder="mongodb+srv://user:pass@cluster/db"
+                    />
+                    <p className="form-hint">{t('Overrides host/port above (Atlas SRV supported).')}</p>
+                  </div>
+                )}
               </>
             )}
           </div>

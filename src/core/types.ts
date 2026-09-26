@@ -12,6 +12,7 @@ export enum DatabaseType {
   MSSQL = 'mssql',
   MariaDB = 'mariadb',
   ClickHouse = 'clickhouse',
+  Elasticsearch = 'elasticsearch',
 }
 
 export enum SSLMode {
@@ -73,6 +74,11 @@ export interface QueryResult {
   columns: ColumnHeader[];
   /** Row data as arrays (ordered by columns) */
   rows: unknown[][];
+  /**
+   * Additional result sets from one request (T-SQL stored procedures /
+   * multi-SELECT batches). The first set lives in `columns`/`rows`.
+   */
+  resultSets?: Array<{ columns: ColumnHeader[]; rows: unknown[][] }>;
   /** Number of rows affected (for INSERT/UPDATE/DELETE) */
   affectedRows: number;
   /** Execution time in milliseconds */
@@ -313,6 +319,7 @@ export function createDefaultConnectionConfig(type: DatabaseType): ConnectionCon
     [DatabaseType.MSSQL]: { host: '127.0.0.1', port: 1433, username: 'sa' },
     [DatabaseType.MariaDB]: { host: '127.0.0.1', port: 3306, username: 'root' },
     [DatabaseType.ClickHouse]: { host: '127.0.0.1', port: 8123, username: 'default' },
+    [DatabaseType.Elasticsearch]: { host: '127.0.0.1', port: 9200, username: '' },
   };
 
   const now = Date.now();
@@ -344,4 +351,5 @@ export const DATABASE_TYPE_META: Record<DatabaseType, { label: string; icon: str
   [DatabaseType.MSSQL]: { label: 'SQL Server', icon: '$(database)', defaultPort: 1433 },
   [DatabaseType.MariaDB]: { label: 'MariaDB', icon: '$(database)', defaultPort: 3306 },
   [DatabaseType.ClickHouse]: { label: 'ClickHouse', icon: '$(database)', defaultPort: 8123 },
+  [DatabaseType.Elasticsearch]: { label: 'Elasticsearch', icon: '$(database)', defaultPort: 9200 },
 };

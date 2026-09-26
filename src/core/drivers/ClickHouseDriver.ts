@@ -1,6 +1,7 @@
 import { createClient, ClickHouseClient } from '@clickhouse/client';
-import { BaseDriver } from './DatabaseDriver';
+import { BaseDriver, RowEdit } from './DatabaseDriver';
 import { Logger } from '../utils/Logger';
+import { driverSetting, driverSettingOrOption } from '../utils/settings';
 import {
   ConnectionConfig,
   QueryResult,
@@ -36,6 +37,10 @@ export class ClickHouseDriver extends BaseDriver {
 
   private client: ClickHouseClient | null = null;
   private currentDb: string = '';
+  /** Id of the in-flight result-set query, for KILL QUERY cancellation. */
+  private lastQueryId?: string;
+  /** Sorting key per `db.table`, captured by getPrimaryKey for stable paging. */
+  private sortKeyCache = new Map<string, string[]>();
 
   async connect(config: ConnectionConfig): Promise<void> {
     this.client = createClient(this.buildClientConfig(config));
@@ -127,7 +132,12 @@ export class ClickHouseDriver extends BaseDriver {
   }
 
   async cancelQuery(): Promise<void> {
-    // P2: KILL QUERY WHERE query_id = ...
+    // HTTP queries can be cancelled by query id (best effort — the request may
+    // have already finished).
+    if (!this.client || !this.lastQueryId) { return; }
+    try {
+      await this.client.command({ query: `KILL QUERY WHERE query_id = ${this.escapeValue(this.lastQueryId)}` });
+    } catch { /* nothing to cancel */ }
   }
 
   // ── Schema introspection ──
@@ -135,12 +145,124 @@ export class ClickHouseDriver extends BaseDriver {
   async getDatabases(): Promise<DatabaseInfo[]> {
     this.ensureConnected();
     const res = await this.query('SELECT name FROM system.databases ORDER BY name');
-    return res.rows.map(row => ({ name: row[0] as string }));
+    const names = res.rows.map(row => row[0] as string);
+    // System databases are noisy (hundreds of tables); hidden unless the
+    // `sqlens.clickhouse.showSystemDatabase` setting is on.
+    const showSystem = driverSetting('clickhouse.showSystemDatabase', false);
+    return names
+      .filter(name => showSystem || !SYSTEM_DATABASES.has(name.toLowerCase()))
+      .map(name => ({ name }));
   }
 
   async getSchemas(): Promise<SchemaInfo[]> {
     // ClickHouse has no schema layer; its "database" is the top namespace.
     return [];
+  }
+
+  // ── In-grid editing (RowEditCapable) ──
+
+  /**
+   * Load one page of a table. ClickHouse pages need an ORDER BY to be stable,
+   * so the sorting key is applied when the setting asks for it.
+   */
+  pageQuery(table: string, limit: number, schema?: string, offset = 0): string {
+    const db = schema || this.currentDb;
+    const requireOrder = driverSetting('clickhouse.requireOrderByPagination', true);
+    const order = requireOrder ? this.sortKeyClause(table, db) : '';
+    return `SELECT * FROM ${this.escapeIdentifier(db)}.${this.escapeIdentifier(table)}${order} LIMIT ${limit} OFFSET ${offset}`;
+  }
+
+  /** ` ORDER BY <sorting key>` when the sorting key is known, else ''. */
+  private sortKeyClause(table: string, db: string): string {
+    const names = this.sortKeyCache.get(`${db}.${table}`) || [];
+    return names.length > 0
+      ? ` ORDER BY ${names.map(n => this.escapeIdentifier(n)).join(', ')}`
+      : '';
+  }
+
+  /**
+   * Apply grid changes as ClickHouse mutations (`ALTER TABLE ... UPDATE/DELETE`)
+   * plus plain INSERTs. Mutations are asynchronous and cannot be rolled back,
+   * so editing is opt-in via `sqlens.clickhouse.allowMutations`.
+   */
+  async applyRowEdits(table: string, rows: RowEdit[], columns: string[], pkColumns: string[], schema?: string): Promise<number> {
+    this.ensureConnected();
+    if (!driverSetting('clickhouse.allowMutations', false)) {
+      throw new Error('In-grid editing is disabled for ClickHouse. Enable "sqlens.clickhouse.allowMutations" to use mutations (asynchronous, not reversible).');
+    }
+
+    const target = `${this.escapeIdentifier(schema || this.currentDb)}.${this.escapeIdentifier(table)}`;
+    const pk = pkColumns.length > 0 ? pkColumns : columns;
+    const whereFor = (values: unknown[]) => pk.map(col => {
+      const i = columns.indexOf(col);
+      const v = values[i];
+      return v === null || v === undefined
+        ? `${this.escapeIdentifier(col)} IS NULL`
+        : `${this.escapeIdentifier(col)} = ${this.escapeValue(v)}`;
+    }).join(' AND ');
+
+    let applied = 0;
+    for (const row of rows) {
+      if (row.status === 'modified') {
+        const sets = row.changedCols
+          .filter(ci => !pk.includes(columns[ci]))
+          .map(ci => `${this.escapeIdentifier(columns[ci])} = ${this.escapeValue(row.data[ci])}`)
+          .join(', ');
+        if (!sets) { continue; }
+        await this.query(`ALTER TABLE ${target} UPDATE ${sets} WHERE ${whereFor(row.original)}`);
+        applied++;
+      } else if (row.status === 'deleted') {
+        await this.query(`ALTER TABLE ${target} DELETE WHERE ${whereFor(row.original)}`);
+        applied++;
+      } else if (row.status === 'added') {
+        const pairs = columns
+          .map((name, i) => ({ name, value: row.data[i] }))
+          .filter(pair => pair.value !== null && pair.value !== undefined);
+        if (pairs.length === 0) { continue; }
+        await this.query(
+          `INSERT INTO ${target} (${pairs.map(p => this.escapeIdentifier(p.name)).join(', ')}) VALUES (${pairs.map(p => this.escapeValue(p.value)).join(', ')})`,
+        );
+        applied++;
+      }
+    }
+    return applied;
+  }
+
+  /**
+   * Export a table (or a query) as text in the given ClickHouse FORMAT —
+   * `JSONEachRow` (default), `CSV`, `TSV`, etc. (P4 Dump).
+   */
+  async exportTable(table: string, format = 'JSONEachRow', schema?: string): Promise<string> {
+    this.ensureConnected();
+    const db = schema || this.currentDb;
+    const query = `SELECT * FROM ${this.escapeIdentifier(db)}.${this.escapeIdentifier(table)} FORMAT ${sanitizeFormat(format)}`;
+    // `exec` returns the raw response body — `query` would append its own
+    // FORMAT clause and clash with the one requested here.
+    const { stream } = await this.client!.exec({ query });
+    let text = '';
+    for await (const chunk of stream) {
+      text += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+    }
+    return text;
+  }
+
+  /**
+   * Fast table/view name listing for progressive tree loading: only names and
+   * engines (no row counts / sizes), so the tree renders immediately.
+   */
+  async getTableNames(schema?: string): Promise<{ name: string; type: 'table' | 'view' }[]> {
+    this.ensureConnected();
+    const db = schema || this.currentDb;
+    if (!db) { return []; }
+    const res = await this.query(`
+      SELECT name, engine FROM system.tables
+      WHERE database = ${this.escapeValue(db)}
+      ORDER BY name
+    `);
+    return res.rows.map(row => ({
+      name: row[0] as string,
+      type: isViewEngine(row[1] as string) ? 'view' as const : 'table' as const,
+    }));
   }
 
   async getTables(schema?: string): Promise<TableInfo[]> {
@@ -194,9 +316,23 @@ export class ClickHouseDriver extends BaseDriver {
     });
   }
 
-  async getIndexes(_table: string, _schema?: string): Promise<IndexInfo[]> {
-    // P2: data-skipping indices via system.data_skipping_indices.
-    return [];
+  async getIndexes(table: string, schema?: string): Promise<IndexInfo[]> {
+    this.ensureConnected();
+    const db = schema || this.currentDb;
+    // ClickHouse indexes are data-skipping indices (no uniqueness); the
+    // primary/sorting key is reported separately by getPrimaryKey().
+    const res = await this.query(`
+      SELECT name, expr, type
+      FROM system.data_skipping_indices
+      WHERE database = ${this.escapeValue(db)} AND table = ${this.escapeValue(table)}
+      ORDER BY name
+    `);
+    return res.rows.map(row => ({
+      name: row[0] as string,
+      columns: [(row[1] as string) || ''],
+      unique: false,
+      type: (row[2] as string) || 'skip_index',
+    }));
   }
 
   async getForeignKeys(_table: string, _schema?: string): Promise<ForeignKeyInfo[]> {
@@ -216,7 +352,9 @@ export class ClickHouseDriver extends BaseDriver {
       WHERE database = ${this.escapeValue(db)} AND table = ${this.escapeValue(table)} AND is_in_primary_key = 1
       ORDER BY position
     `);
-    return res.rows.map(row => row[0] as string);
+    const keys = res.rows.map(row => row[0] as string);
+    if (keys.length > 0) { this.sortKeyCache.set(`${db}.${table}`, keys); }
+    return keys;
   }
 
   // ── Database operations ──
@@ -253,7 +391,12 @@ export class ClickHouseDriver extends BaseDriver {
   }
 
   escapeIdentifier(name: string): string {
-    return '`' + name.replace(/`/g, '``') + '`';
+    // Backticks are the ClickHouse-native quoting; some setups prefer the
+    // ANSI double quotes (setting `sqlens.clickhouse.useBackticks = false`).
+    if (driverSetting('clickhouse.useBackticks', true)) {
+      return '`' + name.replace(/`/g, '``') + '`';
+    }
+    return '"' + name.replace(/"/g, '""') + '"';
   }
 
   escapeValue(value: unknown): string {
@@ -293,6 +436,7 @@ export class ClickHouseDriver extends BaseDriver {
       query,
       format: 'JSONCompactEachRowWithNamesAndTypes',
     });
+    this.lastQueryId = result.query_id;
     const text = await result.text();
 
     const lines = text.split('\n').filter(line => line.trim() !== '');
@@ -314,9 +458,27 @@ export class ClickHouseDriver extends BaseDriver {
       };
     });
 
+    // Long String values are truncated for the grid (full value via export /
+    // Quick View); the cap is `sqlens.clickhouse.stringMaxBytes`.
+    const maxBytes = driverSetting('clickhouse.stringMaxBytes', 512);
+    const stringCols = columns
+      .map((c, i) => ({ c, i }))
+      .filter(({ c }) => /^(Nullable\()?(LowCardinality\()?(Fixed)?String/.test(c.rawType))
+      .map(({ i }) => i);
+    const cappedRows = stringCols.length === 0 ? dataRows : dataRows.map(row => {
+      const copy = [...row];
+      for (const i of stringCols) {
+        const v = copy[i];
+        if (typeof v === 'string' && Buffer.byteLength(v, 'utf8') > maxBytes) {
+          copy[i] = `${truncateUtf8(v, maxBytes)}… [truncated]`;
+        }
+      }
+      return copy;
+    });
+
     return {
       columns,
-      rows: dataRows,
+      rows: cappedRows,
       affectedRows: 0,
       executionTime: 0,
       truncated: false,
@@ -325,6 +487,15 @@ export class ClickHouseDriver extends BaseDriver {
   }
 }
 
+/** Only allow identifier-like FORMAT names (kept out of the SQL text). */
+function sanitizeFormat(format: string): string {
+  const clean = (format || 'JSONEachRow').replace(/[^A-Za-z0-9]/g, '');
+  return clean || 'JSONEachRow';
+}
+
+/** System namespaces hidden from the tree unless explicitly enabled. */
+const SYSTEM_DATABASES = new Set(['system', 'information_schema', 'information_schema_1', 'information_schema_2']);
+
 /** Statements that return a result set (everything else runs via command()). */
 const RESULT_SET_RE = /^\s*(SELECT|WITH|SHOW|DESCRIBE|DESC|EXPLAIN|EXISTS|CHECK)\b/i;
 /** A FORMAT clause already written by the user, at the end of the statement. */
@@ -332,6 +503,16 @@ const FORMAT_CLAUSE_RE = /\bFORMAT\s+\w+\s*$/i;
 
 function isViewEngine(engine?: string): boolean {
   return !!engine && /View$/i.test(engine);
+}
+
+/** Truncate a string to at most `maxBytes` UTF-8 bytes without splitting a code point. */
+function truncateUtf8(value: string, maxBytes: number): string {
+  const buf = Buffer.from(value, 'utf8');
+  if (buf.length <= maxBytes) { return value; }
+  // Back off up to 3 bytes to land on a character boundary.
+  let end = maxBytes;
+  while (end > 0 && (buf[end] & 0xC0) === 0x80) { end--; }
+  return buf.subarray(0, end).toString('utf8');
 }
 
 function toNumber(v: unknown): number | undefined {

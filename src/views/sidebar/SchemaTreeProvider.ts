@@ -43,7 +43,9 @@ class TableItem extends vscode.TreeItem {
 
     const isView = tableInfo.type === 'view' || tableInfo.type === 'materializedView';
     this.iconPath = new vscode.ThemeIcon(isView ? 'eye' : 'table');
-    this.contextValue = 'table';
+    // Views are read-only: a distinct context value keeps the rename/drop/
+    // truncate/structure menus (which match `viewItem == table`) hidden.
+    this.contextValue = isView ? 'view' : 'table';
 
     const parts: string[] = [];
     if (tableInfo.rowCount !== undefined) {
@@ -337,14 +339,14 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
 
     if (!tables) {
       try {
-        // Progressive loading for MySQL-family servers: SHOW TABLES returns in
-        // milliseconds on distributed databases (OceanBase etc.) where the
-        // information_schema stats query takes many seconds. Render the names
-        // immediately, then hydrate row counts/sizes/comments in the background.
-        const mysql = driver as MySQLDriver;
-        if (conn && (conn.config.type === DatabaseType.MySQL || conn.config.type === DatabaseType.MariaDB)
-          && typeof mysql.getTableNames === 'function') {
-          const fast = await mysql.getTableNames(schema);
+        // Progressive loading: drivers that can list names cheaply expose
+        // `getTableNames` (SHOW TABLES, system.tables, sys.tables, _cat/indices,
+        // listCollections). Render the names immediately, then hydrate row
+        // counts/sizes/comments in the background — on large servers the stats
+        // query can take many seconds.
+        const fastProvider = driver as { getTableNames?: (schema?: string) => Promise<{ name: string; type: 'table' | 'view' }[]> };
+        if (typeof fastProvider.getTableNames === 'function') {
+          const fast = await fastProvider.getTableNames(schema);
           if (gen !== this.loadGeneration) { return []; }
           tables = fast.map(tf => ({
             name: tf.name,

@@ -297,7 +297,7 @@ export class DatabaseDumpService {
       return (result.rows[0]?.[1] as string) || '';
     }
 
-    if (driver.driverType === 'postgresql') {
+    if (driver.driverType === 'postgresql' || driver.driverType === 'mssql') {
       const columns = await driver.getColumns(table, schema);
       const primaryKeys = await driver.getPrimaryKey(table, schema).catch(() => []);
       return this.generateCreateTableDDL(driver, table, columns, primaryKeys, schema);
@@ -343,7 +343,9 @@ export class DatabaseDumpService {
     }
     if (value instanceof Uint8Array || value instanceof Buffer) {
       const hex = Buffer.from(value).toString('hex');
-      return driver.driverType === 'postgresql' ? `'\\\\x${hex}'` : `X'${hex}'`;
+      if (driver.driverType === 'postgresql') { return `'\\\\x${hex}'`; }
+      if (driver.driverType === 'mssql') { return `0x${hex}`; }
+      return `X'${hex}'`;
     }
     return driver.escapeValue(value);
   }

@@ -9,9 +9,12 @@ It works in VS Code and VS Code forks such as Trae, and the UI follows your edit
 ## Features
 
 - Manage database connections from the Sqlens activity bar.
-- Connect to MySQL, PostgreSQL, and SQLite databases.
+- Connect to MySQL / MariaDB, PostgreSQL, and SQLite databases.
+- Connect to ClickHouse (columnar, HTTP 8123), Elasticsearch (REST request editor), MongoDB (mongosh-style commands), and SQL Server (T-SQL) databases.
 - Connect to Redis (standalone / cluster / sentinel, with SSH tunneling and TLS).
 - Open `.db`, `.sqlite`, and `.sqlite3` files with the built-in SQLite viewer.
+- Export/import connection configurations as JSON (passwords excluded by default; plaintext requires a confirmation) for moving between machines.
+- Double-click a disconnected connection in the sidebar to connect (a single click only selects).
 - Browse schemas, tables, views, columns, indexes, and foreign keys.
 - Open table data in an editable data grid (sort, filter, paginate, inline edit).
 - Run SQL from `.sql` files with CodeLens actions and per-file connection context.
@@ -32,6 +35,10 @@ It works in VS Code and VS Code forks such as Trae, and the UI follows your edit
 | PostgreSQL | Supported |
 | SQLite | Supported via `sql.js` |
 | Redis | Supported (standalone / cluster / sentinel, ioredis) |
+| ClickHouse | Supported (`@clickhouse/client`; rich types, opt-in mutation editing, `FORMAT` export) |
+| Elasticsearch | Supported (8.x; index/field tree, REST request editor, NDJSON export/import, aggregation bars) |
+| MongoDB | Supported (official driver; mongosh-style queries, document CRUD, JSON export/import, `_id` cursor deep paging) |
+| SQL Server | Supported (T-SQL; `OFFSET/FETCH` paging, multi-result-set tabs, `bcp` export, NTLM/Azure AD auth) |
 
 ## Getting Started
 

@@ -5,6 +5,8 @@ import * as os from 'os';
 import { glob } from 'glob';
 import { v4 as uuidv4 } from 'uuid';
 import { ConnectionManager } from './core/connection/ConnectionManager';
+import { ConnectionStorage } from './core/connection/ConnectionStorage';
+import { ConnectionTransfer } from './core/connection/ConnectionTransfer';
 import { ConnectionTreeProvider, ConnectionDragAndDropController } from './views/sidebar/ConnectionTreeProvider';
 import { SchemaTreeProvider } from './views/sidebar/SchemaTreeProvider';
 import { SavedQueryTreeProvider } from './views/sidebar/SavedQueryTreeProvider';
@@ -31,7 +33,7 @@ import {
   SSLMode,
 } from './core/types';
 import { DriverFactory } from './core/drivers';
-import type { DatabaseDriver } from './core/drivers/DatabaseDriver';
+import type { DatabaseDriver, RowEditCapable } from './core/drivers/DatabaseDriver';
 import { ProjectConnectionStorage } from './core/connection/ProjectConnectionStorage';
 import { DatabaseDumpService } from './core/utils/DatabaseDumpService';
 import { ImportExportService } from './core/utils/ImportExportService';
@@ -544,11 +546,33 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── Tree Views ──
 
-  context.subscriptions.push(
-    vscode.window.createTreeView('sqlens.connections', {
+  const connectionsTreeView = vscode.window.createTreeView('sqlens.connections', {
       treeDataProvider: connectionTreeProvider,
       showCollapseAll: true,
       dragAndDropController: new ConnectionDragAndDropController(connectionTreeProvider),
+    });
+  context.subscriptions.push(
+    connectionsTreeView,
+  );
+
+  // Double click on a disconnected connection row connects it. VS Code tree
+  // views have no dblclick event, and re-clicking an already-selected row does
+  // not fire a selection change — but the item command runs on every click.
+  // So the item command records the click time and connects only when the same
+  // row is clicked twice within the window.
+  const DOUBLE_CLICK_MS = 400;
+  const lastRowClick = new Map<string, number>();
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.connectionRowClick', (id: string) => {
+      if (!id) { return; }
+      const now = Date.now();
+      const previous = lastRowClick.get(id);
+      if (previous !== undefined && now - previous < DOUBLE_CLICK_MS) {
+        lastRowClick.delete(id);
+        void vscode.commands.executeCommand('sqlens.connect', id);
+        return;
+      }
+      lastRowClick.set(id, now);
     }),
   );
 
@@ -764,11 +788,8 @@ export function activate(context: vscode.ExtensionContext) {
   const mcpEnabled = vscode.workspace.getConfiguration('sqlens.mcp').get<boolean>('enabled', true);
   if (mcpEnabled) {
     void mcpService.start(context);
-    // Default the empty panel to the MCP server tab (closable; closing shows the
-    // usual "Nothing open yet" empty state).
-    if (panelTabHandlers.size === 0) {
-      postMcpStatus(true);
-    }
+    // The MCP Server panel is opened on demand only (title-bar button or
+    // command palette) — never automatically on startup.
   }
 
   // Refresh the MCP panel whenever the server starts/stops or the token changes.
@@ -864,6 +885,20 @@ export function activate(context: vscode.ExtensionContext) {
       // prompt is needed. Default to MySQL.
       const config = createDefaultConnectionConfig(DatabaseType.MySQL);
       openConnectionForm(config);
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.exportConnections', async () => {
+      const transfer = new ConnectionTransfer(new ConnectionStorage(context));
+      const file = await transfer.exportConnections();
+      if (file) {
+        vscode.window.showInformationMessage(`Connections exported to ${file}`);
+      }
+    }),
+    vscode.commands.registerCommand('sqlens.importConnections', async () => {
+      const transfer = new ConnectionTransfer(new ConnectionStorage(context));
+      await transfer.importConnections();
     }),
   );
 
@@ -1731,7 +1766,26 @@ export function activate(context: vscode.ExtensionContext) {
           ? editor.document.getText()
           : editor.document.getText(editor.selection);
 
-        const formatted = format(text, { language: 'sql', tabWidth: 2, keywordCase: 'upper' });
+        // Dialect-aware formatting: T-SQL/PostgreSQL/MySQL have their own
+        // formatter grammars; document/key-value drivers get JSON formatting.
+        const activeDriver = connectionManager.activeConnectionId
+          ? connectionManager.getDriver(connectionManager.activeConnectionId)
+          : undefined;
+        const driverType = activeDriver?.driverType;
+
+        let formatted: string;
+        if (driverType === 'elasticsearch' || driverType === 'mongodb') {
+          formatted = formatJsonish(text);
+        } else {
+          const languageByDriver: Record<string, string> = {
+            mssql: 'tsql',
+            postgresql: 'postgresql',
+            mysql: 'mysql',
+            mariadb: 'mysql',
+          };
+          const language = (driverType && languageByDriver[driverType]) || 'sql';
+          formatted = format(text, { language, tabWidth: 2, keywordCase: 'upper' });
+        }
 
         const range = editor.selection.isEmpty
           ? new vscode.Range(
@@ -1804,8 +1858,13 @@ export function activate(context: vscode.ExtensionContext) {
           ? `${driver.escapeIdentifier(schema)}.${driver.escapeIdentifier(table)}`
           : driver.escapeIdentifier(table);
 
-        // Use limit+1 trick: fetch one extra row to know if there are more pages
-        const sql = `SELECT * FROM ${escapedTable} ${driver.paginationSQL(pageSize + 1, 0)}`;
+        // Use limit+1 trick: fetch one extra row to know if there are more pages.
+        // Non-SQL drivers build their own page query (ES from/size, MongoDB
+        // skip/limit, T-SQL OFFSET/FETCH, ClickHouse LIMIT/OFFSET).
+        const pageAware = driver as unknown as Partial<RowEditCapable>;
+        const sql = typeof pageAware.pageQuery === 'function'
+          ? pageAware.pageQuery(table, pageSize + 1, schema, 0)
+          : `SELECT * FROM ${escapedTable} ${driver.paginationSQL(pageSize + 1, 0)}`;
         attemptedSql = sql;
 
         const initialLoadingResult: QueryResult = {
@@ -1994,6 +2053,211 @@ export function activate(context: vscode.ExtensionContext) {
       } catch (err) {
         vscode.window.showErrorMessage(t('Redis import failed: {0}', err));
       }
+    }),
+  );
+
+  // ── Elasticsearch / MongoDB / ClickHouse P4 commands ──
+
+  /** Resolve the driver for one of these commands (explicit row or active). */
+  const driverOfType = (type: string, item?: any) => {
+    const connId = item?.config?.id || item?.connectionId || connectionManager.activeConnectionId;
+    if (!connId) { vscode.window.showErrorMessage(t('No active connection.')); return undefined; }
+    const driver = connectionManager.getDriver(connId);
+    if (!driver || driver.driverType !== type) {
+      vscode.window.showErrorMessage(t('This action requires an active connection of type "{0}".', type));
+      return undefined;
+    }
+    return driver as unknown as Record<string, (...args: any[]) => Promise<any>>;
+  };
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.esCreateIndex', async (item?: any) => {
+      const driver = driverOfType('elasticsearch', item); if (!driver) { return; }
+      const name = await vscode.window.showInputBox({ prompt: t('Index name'), placeHolder: 'my-index-000001' });
+      if (!name) { return; }
+      const mapping = await vscode.window.showInputBox({ prompt: t('Mappings JSON (optional)'), placeHolder: '{"properties":{"title":{"type":"text"}}}' });
+      try {
+        await driver.createIndex(name, mapping || undefined);
+        vscode.window.showInformationMessage(t('Index "{0}" created.', name));
+        await vscode.commands.executeCommand('sqlens.refreshSchema');
+      } catch (err) {
+        vscode.window.showErrorMessage(t('Create index failed: {0}', err));
+      }
+    }),
+    vscode.commands.registerCommand('sqlens.esDeleteIndex', async (item?: any) => {
+      const driver = driverOfType('elasticsearch', item); if (!driver) { return; }
+      const name = item?.tableInfo?.name || await vscode.window.showInputBox({ prompt: t('Index name to delete') });
+      if (!name) { return; }
+      const confirm = await vscode.window.showWarningMessage(t('Delete index "{0}" and all its documents? This cannot be undone.', name), { modal: true }, t('Delete'));
+      if (confirm !== t('Delete')) { return; }
+      try {
+        await driver.deleteIndex(name);
+        vscode.window.showInformationMessage(t('Index "{0}" deleted.', name));
+        await vscode.commands.executeCommand('sqlens.refreshSchema');
+      } catch (err) {
+        vscode.window.showErrorMessage(t('Delete index failed: {0}', err));
+      }
+    }),
+    vscode.commands.registerCommand('sqlens.esExport', async (item?: any) => {
+      const driver = driverOfType('elasticsearch', item); if (!driver) { return; }
+      const index = item?.tableInfo?.name || await vscode.window.showInputBox({ prompt: t('Index to export') });
+      if (!index) { return; }
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(`${index}-${Date.now()}.ndjson`),
+        filters: { NDJSON: ['ndjson', 'json'] },
+      });
+      if (!uri) { return; }
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t('Exporting documents...'), cancellable: false },
+        async () => {
+          const ndjson = await driver.exportNdjson(index);
+          await vscode.workspace.fs.writeFile(uri, Buffer.from(ndjson, 'utf8'));
+          vscode.window.showInformationMessage(t('Exported documents from "{0}".', index));
+        },
+      );
+    }),
+    vscode.commands.registerCommand('sqlens.esImport', async (item?: any) => {
+      const driver = driverOfType('elasticsearch', item); if (!driver) { return; }
+      const file = (await vscode.window.showOpenDialog({ canSelectMany: false, filters: { NDJSON: ['ndjson', 'json'] } }))?.[0];
+      if (!file) { return; }
+      const index = item?.tableInfo?.name || await vscode.window.showInputBox({ prompt: t('Target index') });
+      if (!index) { return; }
+      try {
+        const content = Buffer.from(await vscode.workspace.fs.readFile(file)).toString('utf8');
+        const count = await driver.importNdjson(index, content);
+        vscode.window.showInformationMessage(t('Imported documents into "{0}".', index));
+        void count;
+        await vscode.commands.executeCommand('sqlens.refreshSchema');
+      } catch (err) {
+        vscode.window.showErrorMessage(t('Import failed: {0}', err));
+      }
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.mongoCreateCollection', async (item?: any) => {
+      const driver = driverOfType('mongodb', item); if (!driver) { return; }
+      const name = await vscode.window.showInputBox({ prompt: t('Collection name') });
+      if (!name) { return; }
+      try {
+        await driver.createCollection(name);
+        vscode.window.showInformationMessage(t('Collection "{0}" created.', name));
+        await vscode.commands.executeCommand('sqlens.refreshSchema');
+      } catch (err) {
+        vscode.window.showErrorMessage(t('Create collection failed: {0}', err));
+      }
+    }),
+    vscode.commands.registerCommand('sqlens.mongoCreateIndex', async (item?: any) => {
+      const driver = driverOfType('mongodb', item); if (!driver) { return; }
+      const collection = item?.tableInfo?.name || await vscode.window.showInputBox({ prompt: t('Collection') });
+      if (!collection) { return; }
+      const keys = await vscode.window.showInputBox({ prompt: t('Index key JSON'), placeHolder: '{"status": 1}' });
+      if (!keys) { return; }
+      try {
+        const name = await driver.createIndex(collection, keys, false);
+        vscode.window.showInformationMessage(t('Index "{0}" created.', name));
+      } catch (err) {
+        vscode.window.showErrorMessage(t('Create index failed: {0}', err));
+      }
+    }),
+    vscode.commands.registerCommand('sqlens.mongoExport', async (item?: any) => {
+      const driver = driverOfType('mongodb', item); if (!driver) { return; }
+      const collection = item?.tableInfo?.name || await vscode.window.showInputBox({ prompt: t('Collection to export') });
+      if (!collection) { return; }
+      const filter = await vscode.window.showInputBox({ prompt: t('Filter JSON (optional)'), placeHolder: '{"status":"PAID"}' });
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(`${collection}-${Date.now()}.json`),
+        filters: { JSON: ['json'] },
+      });
+      if (!uri) { return; }
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t('Exporting documents...'), cancellable: false },
+        async () => {
+          const docs = await driver.exportJson(collection, filter || undefined);
+          await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(docs, null, 2), 'utf8'));
+          vscode.window.showInformationMessage(t('Exported {0} documents.', docs.length));
+        },
+      );
+    }),
+    vscode.commands.registerCommand('sqlens.mongoImport', async (item?: any) => {
+      const driver = driverOfType('mongodb', item); if (!driver) { return; }
+      const file = (await vscode.window.showOpenDialog({ canSelectMany: false, filters: { JSON: ['json'] } }))?.[0];
+      if (!file) { return; }
+      const collection = item?.tableInfo?.name || await vscode.window.showInputBox({ prompt: t('Target collection') });
+      if (!collection) { return; }
+      try {
+        const parsed = JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(file)).toString('utf8'));
+        const docs = Array.isArray(parsed) ? parsed : [parsed];
+        const count = await driver.importJson(collection, docs);
+        vscode.window.showInformationMessage(t('Imported {0} documents.', count));
+        await vscode.commands.executeCommand('sqlens.refreshSchema');
+      } catch (err) {
+        vscode.window.showErrorMessage(t('Import failed: {0}', err));
+      }
+    }),
+    vscode.commands.registerCommand('sqlens.mongoShell', async (item?: any) => {
+      const driver = driverOfType('mongodb', item); if (!driver) { return; }
+      const text = await vscode.window.showInputBox({ prompt: t('mongosh passthrough (stats / listIndexes / validate / drop / renameCollection)') });
+      if (!text) { return; }
+      try {
+        const res = await driver.evalShell(text);
+        const output = vscode.window.createOutputChannel('Sqlens mongosh');
+        output.clear();
+        output.appendLine(res.rows.map((r: unknown[]) => r.map(String).join(' | ')).join('\n'));
+        output.show();
+      } catch (err) {
+        vscode.window.showErrorMessage(t('Passthrough failed: {0}', err));
+      }
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.clickhouseExport', async (item?: any) => {
+      const driver = driverOfType('clickhouse', item); if (!driver) { return; }
+      const table = item?.tableInfo?.name || await vscode.window.showInputBox({ prompt: t('Table to export') });
+      if (!table) { return; }
+      const format = await vscode.window.showQuickPick(
+        ['JSONEachRow', 'CSV', 'TSV', 'JSON', 'PrettyCompact'],
+        { placeHolder: t('ClickHouse FORMAT') },
+      );
+      if (!format) { return; }
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(`${table}-${Date.now()}.${format.toLowerCase()}`),
+      });
+      if (!uri) { return; }
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t('Exporting table...'), cancellable: false },
+        async () => {
+          const content = await driver.exportTable(table, format, item?.schema);
+          await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
+          vscode.window.showInformationMessage(t('Exported "{0}" as {1}.', table, format));
+        },
+      );
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.mssqlBcpExport', async (item?: any) => {
+      const driver = driverOfType('mssql', item); if (!driver) { return; }
+      const table = item?.tableInfo?.name || await vscode.window.showInputBox({ prompt: t('Table to export with bcp') });
+      if (!table) { return; }
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(`${table}-${Date.now()}.txt`),
+        filters: { 'Text (tab separated)': ['txt', 'tsv', 'csv'] },
+      });
+      if (!uri) { return; }
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: t('Exporting with bcp...'), cancellable: false },
+        async () => {
+          try {
+            await (driver as unknown as { exportBcp: (t: string, f: string, s?: string) => Promise<void> })
+              .exportBcp(table, uri.fsPath, item?.schema);
+            vscode.window.showInformationMessage(t('Exported "{0}" with bcp to {1}.', table, uri.fsPath));
+          } catch (err) {
+            vscode.window.showErrorMessage(t('bcp export failed: {0}', err));
+          }
+        },
+      );
     }),
   );
 
@@ -2430,6 +2694,21 @@ export function activate(context: vscode.ExtensionContext) {
               const res = await driver.query(`EXPLAIN ${sql}`);
               planResult = { format: 'text', raw: res.rows.map(r => JSON.stringify(r)).join('\n') };
             }
+          } else if (driver.driverType === 'mssql') {
+            // T-SQL has no EXPLAIN; SET STATISTICS PROFILE returns plan rows.
+            const res = await (driver as unknown as { explainQuery: (s: string) => Promise<any> }).explainQuery(sql);
+            planResult = { format: 'text', raw: res.rows.map((r: unknown[]) => r.map(String).join(' | ')).join('\n') };
+          } else if (driver.driverType === 'clickhouse') {
+            const res = await driver.query(`EXPLAIN ${sql}`);
+            planResult = { format: 'text', raw: res.rows.map(r => r.map(String).join(' | ')).join('\n') };
+          } else if (driver.driverType === 'mongodb') {
+            const res = await (driver as unknown as { explainQuery: (s: string) => Promise<any> }).explainQuery(sql);
+            planResult = { format: 'json', raw: res.rows[0]?.[0] };
+          } else if (driver.driverType === 'elasticsearch') {
+            const index = sql.match(/^\s*(?:GET|POST)\s+\/?([^/\s?]+)\/_search/i)?.[1] || '_all';
+            const body = sql.match(/\{[\s\S]*\}\s*$/)?.[0] || '';
+            const res = await (driver as unknown as { explainSearch: (i: string, b: string) => Promise<any> }).explainSearch(index, body);
+            planResult = { format: 'json', raw: res.rows[0]?.[0] };
           } else if (driver.driverType === 'sqlite') {
             try {
               const res = await driver.query(`EXPLAIN QUERY PLAN ${sql}`);
@@ -3204,19 +3483,25 @@ export function activate(context: vscode.ExtensionContext) {
   // ── Helper Functions ──
 
   function serializeQueryResult(result: QueryResult): QueryResult {
+    const serializeRows = (rows: unknown[][]): unknown[][] => rows.map(row =>
+      row.map(v => {
+        if (v === null || v === undefined) return null;
+        if (Buffer.isBuffer(v)) return v.toString('utf8');
+        if (typeof v === 'bigint') return v.toString();
+        if (typeof v === 'object') {
+          try { return JSON.stringify(v); } catch { return String(v); }
+        }
+        return v;
+      }),
+    );
+
     return {
       ...result,
-      rows: result.rows.map(row =>
-        row.map(v => {
-          if (v === null || v === undefined) return null;
-          if (Buffer.isBuffer(v)) return v.toString('utf8');
-          if (typeof v === 'bigint') return v.toString();
-          if (typeof v === 'object') {
-            try { return JSON.stringify(v); } catch { return String(v); }
-          }
-          return v;
-        })
-      ),
+      rows: serializeRows(result.rows),
+      // Extra result sets (T-SQL batches) get the same treatment.
+      ...(result.resultSets
+        ? { resultSets: result.resultSets.map(set => ({ columns: set.columns, rows: serializeRows(set.rows) })) }
+        : {}),
     };
   }
 
@@ -3432,6 +3717,36 @@ export function activate(context: vscode.ExtensionContext) {
             activate: true,
           },
         );
+
+        // Additional result sets (T-SQL multi-SELECT / stored procedures)
+        // open as their own read-only tabs.
+        (serializedResult.resultSets || []).forEach((set, index) => {
+          showResultsInDataGrid(
+            `Result ${index + 2}`,
+            {
+              columns: set.columns,
+              rows: set.rows,
+              affectedRows: 0,
+              executionTime: 0,
+              truncated: false,
+              messages: [],
+            },
+            undefined,
+            undefined,
+            activeConnectionId || undefined,
+            undefined,
+            pageSize,
+            false,
+            {
+              inPanel: true,
+              instanceId: `${instanceId}-set${index + 2}`,
+              tabKind: 'query',
+              tabTitle: `${queryTabTitle(sql)} (${index + 2})`,
+              querySql: sql,
+              activate: false,
+            },
+          );
+        });
       } else {
         vscode.window.showInformationMessage(
           `Query executed: ${result.affectedRows} rows affected (${result.executionTime}ms)`
@@ -3673,6 +3988,33 @@ export function activate(context: vscode.ExtensionContext) {
       if (message.type === 'fetchPage' && connId && tableName) {
         const driver = connectionManager.getDriver(connId);
         if (driver) {
+          // Drivers that page natively (Elasticsearch from/size, MongoDB
+          // skip/limit, T-SQL OFFSET/FETCH, ClickHouse LIMIT/OFFSET) build
+          // their own query; the SQL family keeps the generated SELECT below.
+          const pageAware = driver as unknown as Partial<RowEditCapable>;
+          if (typeof pageAware.pageQuery === 'function') {
+            const page = message.data.page ?? 0;
+            const pageSize = vscode.workspace.getConfiguration('sqlens').get<number>('defaultRowsPerPage', 1000);
+            try {
+              // pageQuery may refuse a deep jump synchronously (no cursor yet).
+              const pagedSql = pageAware.pageQuery!(tableName, pageSize + 1, schemaName, page * pageSize);
+              const result = serializeQueryResult(await driver.query(pagedSql));
+              const hasMore = result.rows.length > pageSize;
+              send({
+                type: 'pageData',
+                page,
+                data: { ...result, rows: hasMore ? result.rows.slice(0, pageSize) : result.rows },
+                columns: result.columns,
+                hasMore,
+                pageSize,
+                querySql: pagedSql,
+              } as any);
+            } catch (err) {
+              send({ type: 'error', data: { message: err instanceof Error ? err.message : String(err) } } as any);
+            }
+            return;
+          }
+
           let sql: string | undefined;
           try {
             const page = message.data.page;
@@ -3797,6 +4139,39 @@ export function activate(context: vscode.ExtensionContext) {
           const changedRows = message.data.rows as any[];
           const columns = result.columns.map(c => c.name);
           const pkCols = result.columns.filter(c => c.isPrimaryKey).map(c => c.name);
+
+          // Document/columnar drivers implement editing themselves (SQL cannot
+          // express ES updates, Mongo $set or ClickHouse mutations).
+          const rowEditor = driver as unknown as Partial<RowEditCapable>;
+          if (typeof rowEditor.applyRowEdits === 'function') {
+            const applied = await rowEditor.applyRowEdits(tableName, changedRows, columns, pkCols, schemaName);
+            if (applied === 0) { return; }
+            vscode.window.showInformationMessage(t('{0} changes saved.', applied));
+
+            const pageSizeDoc = vscode.workspace.getConfiguration('sqlens').get<number>('defaultRowsPerPage', 1000);
+            const refreshSqlDoc = typeof rowEditor.pageQuery === 'function'
+              ? rowEditor.pageQuery(tableName, pageSizeDoc + 1, schemaName)
+              : null;
+            if (refreshSqlDoc) {
+              const refreshResultDoc = serializeQueryResult(await driver.query(refreshSqlDoc));
+              const hasMoreDoc = refreshResultDoc.rows.length > pageSizeDoc;
+              send({
+                type: 'queryResult',
+                data: {
+                  ...refreshResultDoc,
+                  columns: result.columns,
+                  rows: hasMoreDoc ? refreshResultDoc.rows.slice(0, pageSizeDoc) : refreshResultDoc.rows,
+                },
+                tableName,
+                schemaName,
+                pageSize: pageSizeDoc,
+                hasMore: hasMoreDoc,
+                querySql: refreshSqlDoc,
+              } as any);
+            }
+            return;
+          }
+
           const escapedTable = schemaName
             ? `${driver.escapeIdentifier(schemaName)}.${driver.escapeIdentifier(tableName)}`
             : driver.escapeIdentifier(tableName);
@@ -3816,7 +4191,18 @@ export function activate(context: vscode.ExtensionContext) {
             } else if (row.status === 'added') {
               const nonNull = columns.map((col, i) => ({ col, val: row.data[i] })).filter(x => x.val !== null);
               if (nonNull.length > 0) {
-                statements.push(`INSERT INTO ${escapedTable} (${nonNull.map(x => driver.escapeIdentifier(x.col)).join(', ')}) VALUES (${nonNull.map(x => driver.escapeValue(x.val)).join(', ')})`);
+                const insertSql = `INSERT INTO ${escapedTable} (${nonNull.map(x => driver.escapeIdentifier(x.col)).join(', ')}) VALUES (${nonNull.map(x => driver.escapeValue(x.val)).join(', ')})`;
+                // SQL Server needs IDENTITY_INSERT enabled to write an
+                // identity column explicitly.
+                const identityCols = result.columns.filter(c => c.isAutoIncrement).map(c => c.name);
+                const writesIdentity = driver.driverType === 'mssql' && nonNull.some(x => identityCols.includes(x.col));
+                if (writesIdentity) {
+                  statements.push(`SET IDENTITY_INSERT ${escapedTable} ON`);
+                  statements.push(insertSql);
+                  statements.push(`SET IDENTITY_INSERT ${escapedTable} OFF`);
+                } else {
+                  statements.push(insertSql);
+                }
               }
             } else if (row.status === 'deleted') {
               const where = (pkCols.length > 0 ? pkCols : columns).map(col => {
@@ -4623,4 +5009,40 @@ export function deactivate() {
   connectionManager?.dispose();
   webviewManager?.disposeAll();
   queryHistory?.dispose();
+}
+
+/**
+ * Pretty-print driver text that is not SQL: an Elasticsearch request
+ * (`METHOD /path` + JSON body) or a mongosh call (`db.coll.method({...})`).
+ * Anything unparsable is returned unchanged.
+ */
+function formatJsonish(text: string): string {
+  const lines = text.split('\n');
+  const first = (lines[0] ?? '').trim();
+
+  if (/^(GET|POST|PUT|DELETE|HEAD)\s+\/\S*/i.test(first)) {
+    const body = lines.slice(1).join('\n').trim();
+    if (!body) { return first; }
+    try {
+      return `${first}\n${JSON.stringify(JSON.parse(body), null, 2)}`;
+    } catch {
+      return text;
+    }
+  }
+
+  const mongosh = text.trim().match(/^(db\.[\w$.-]+\.\w+)\(([\s\S]*)\)([\s\S]*)$/);
+  if (mongosh) {
+    const [, prefix, rawArgs, chain] = mongosh;
+    try {
+      // Keep the mongosh literals readable while pretty-printing the JSON.
+      const normalized = rawArgs
+        .replace(/ObjectId\(\s*'([^']*)'\s*\)/g, '"$1"')
+        .replace(/ISODate\(\s*'([^']*)'\s*\)/g, '"$1"');
+      return `${prefix}(${JSON.stringify(JSON.parse(normalized), null, 2)})${chain}`;
+    } catch {
+      return text;
+    }
+  }
+
+  return text;
 }

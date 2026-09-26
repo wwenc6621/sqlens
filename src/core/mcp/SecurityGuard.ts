@@ -1,113 +1,35 @@
 /**
- * SQL security validation for MCP tool calls.
- * All AI-originated SQL must pass through here before execution.
+ * Driver-aware security validation for MCP tool calls.
+ * All AI-originated statements must pass through here before execution.
+ *
+ * Classification is delegated to a per-driver `StatementClassifier` registry
+ * (SQL for MySQL/PG/SQLite/ClickHouse/MSSQL, command tables for Redis, REST
+ * paths for Elasticsearch, method names for MongoDB) — see
+ * docs/REDIS_SUPPORT_DESIGN.md §11.1.
  */
+
+import {
+  getClassifier,
+  splitSqlStatements,
+  type StatementCategory,
+} from './StatementClassifiers';
 
 export type SqlCategory = 'read' | 'write' | 'ddl' | 'other';
 
-import { classifyRedisCommand, splitRedisCommands } from '../redisCommands';
-
-const READ_KEYWORDS = /^(select|show|describe|desc|explain|with|use)\b/i;
-const WRITE_KEYWORDS = /^(insert|update|delete)\b/i;
-const DDL_KEYWORDS = /^(create|alter|drop|truncate|rename|grant|revoke|comment|vacuum|analyze|call|set|lock)\b/i;
-
-/** SQL features that are always forbidden for AI calls */
-const FORBIDDEN_PATTERNS: { pattern: RegExp; reason: string }[] = [
-  { pattern: /\binto\s+(outfile|dumpfile)\b/i, reason: 'INTO OUTFILE/DUMPFILE is not allowed' },
-  { pattern: /\bload_file\s*\(/i, reason: 'LOAD_FILE is not allowed' },
-  { pattern: /\bload_data\b/i, reason: 'LOAD DATA is not allowed' },
-  { pattern: /\bpg_read_file\b|\bpg_ls_dir\b|\bcopy\s+.*\bfrom\s+program\b/i, reason: 'Server file access functions are not allowed' },
-  { pattern: /\bsleep\s*\(|\bbenchmark\s*\(/i, reason: 'Sleep/benchmark functions are not allowed' },
-  { pattern: /\binformation_schema\.processlist\b/i, reason: 'Process inspection is not allowed' },
-];
-
 /** Split SQL into statements, respecting quotes and comments (lightweight). */
 export function splitStatements(sql: string): string[] {
-  const statements: string[] = [];
-  let current = '';
-  let inSingle = false;
-  let inDouble = false;
-  let inBacktick = false;
-  let inLineComment = false;
-  let inBlockComment = false;
-  let inDollarQuote: string | null = null;
-
-  for (let i = 0; i < sql.length; i++) {
-    const ch = sql[i];
-    const next = sql[i + 1];
-
-    if (inLineComment) {
-      current += ch;
-      if (ch === '\n') { inLineComment = false; }
-      continue;
-    }
-    if (inBlockComment) {
-      current += ch;
-      if (ch === '*' && next === '/') { current += '/'; i++; inBlockComment = false; }
-      continue;
-    }
-    if (inSingle) {
-      current += ch;
-      if (ch === "'" && next === "'") { current += "'"; i++; }
-      else if (ch === '\\') { current += next ?? ''; i++; }
-      else if (ch === "'") { inSingle = false; }
-      continue;
-    }
-    if (inDouble) {
-      current += ch;
-      if (ch === '"' && next === '"') { current += '"'; i++; }
-      else if (ch === '"') { inDouble = false; }
-      continue;
-    }
-    if (inBacktick) {
-      current += ch;
-      if (ch === '`') { inBacktick = false; }
-      continue;
-    }
-    if (inDollarQuote) {
-      current += ch;
-      if (sql.startsWith(inDollarQuote, i)) { current += inDollarQuote.slice(1); i += inDollarQuote.length - 1; inDollarQuote = null; }
-      continue;
-    }
-
-    if (ch === '-' && next === '-') { current += '--'; i++; inLineComment = true; continue; }
-    if (ch === '/' && next === '*') { current += '/*'; i++; inBlockComment = true; continue; }
-    if (ch === "'") { inSingle = true; current += ch; continue; }
-    if (ch === '"') { inDouble = true; current += ch; continue; }
-    if (ch === '`') { inBacktick = true; current += ch; continue; }
-    if (ch === '$') {
-      const m = /^\$[A-Za-z_]*\$/.exec(sql.slice(i));
-      if (m) { inDollarQuote = m[0]; current += m[0]; i += m[0].length - 1; continue; }
-    }
-    if (ch === ';') {
-      if (current.trim()) { statements.push(current.trim()); }
-      current = '';
-      continue;
-    }
-    current += ch;
-  }
-  if (current.trim()) { statements.push(current.trim()); }
-  return statements;
+  return splitSqlStatements(sql);
 }
 
 /** Strip comments so keyword detection sees actual SQL structure. */
 export function stripComments(sql: string): string {
-  return splitStatements(sql).join('; ');
+  return splitSqlStatements(sql).join('; ');
 }
 
-/** Classify a single statement. */
+/** Classify a single SQL statement (SQL-family view, kept for compatibility). */
 export function classifyStatement(sql: string): SqlCategory {
-  const clean = sql.trim();
-  if (READ_KEYWORDS.test(clean)) {
-    // WITH ... INSERT/UPDATE/DELETE (CTE write) counts as write
-    if (/^with\b/i.test(clean) && /\b(insert|update|delete)\b/i.test(clean.replace(/^with\b[\s\S]*?\bselect\b[\s\S]*?\)\s*/i, ''))) {
-      return 'write';
-    }
-    return 'read';
-  }
-  if (WRITE_KEYWORDS.test(clean)) { return 'write'; }
-  if (DDL_KEYWORDS.test(clean)) { return 'ddl'; }
-  return 'other';
+  const category: StatementCategory = getClassifier('mysql').classify(sql.trim()).category;
+  return category === 'danger' ? 'ddl' : category;
 }
 
 export interface GuardResult {
@@ -121,77 +43,73 @@ export class SecurityGuard {
    * Validate a statement before execution.
    * @param readOnly when true, only read statements pass.
    * @param allowWrite when true (write mode), INSERT/UPDATE/DELETE pass but DDL does not.
-   * @param driverType when provided, classification is driver-aware (see docs §11).
+   * @param driverType driver-aware classification (SQL / redis / es / mongo / ...).
    */
-  validate(sql: string, opts: { readOnly: boolean; allowWrite: boolean; driverType?: string }): GuardResult {
-    if (opts.driverType === 'redis') {
-      return this.validateRedis(sql, opts);
-    }
-
-    const statements = splitStatements(sql);
+  validate(text: string, opts: { readOnly: boolean; allowWrite: boolean; driverType?: string }): GuardResult {
+    const classifier = getClassifier(opts.driverType);
+    const statements = classifier.split(text);
 
     if (statements.length === 0) {
-      return { ok: false, reason: 'Empty SQL statement' };
+      return { ok: false, reason: 'Empty statement' };
     }
-    if (statements.length > 1) {
+    // The SQL family executes one statement per call; other drivers accept
+    // their own multi-statement forms (Redis lines, mongosh calls).
+    if (classifier.driverType === 'sql' && statements.length > 1) {
       return { ok: false, reason: 'Multiple statements are not allowed. Execute one statement at a time.' };
     }
 
-    const stmt = statements[0];
+    const classified = statements.map(stmt => classifier.classify(stmt));
 
-    for (const { pattern, reason } of FORBIDDEN_PATTERNS) {
-      if (pattern.test(stmt)) {
-        return { ok: false, reason };
-      }
-    }
-
-    const category = classifyStatement(stmt);
-
-    if (category === 'read') {
-      return { ok: true, statements: [stmt] };
+    // Danger is refused unconditionally.
+    const danger = classified.find(c => c.category === 'danger');
+    if (danger) {
+      return { ok: false, reason: danger.reason ?? 'Blocked statement.' };
     }
 
     if (opts.readOnly) {
-      return { ok: false, reason: `Read-only mode: "${category}" statements are not allowed. Only SELECT/SHOW/DESCRIBE/EXPLAIN are permitted.` };
+      const offending = classified.find(c => c.category !== 'read');
+      if (offending) {
+        const label = firstToken(offending.text);
+        return { ok: false, reason: `Read-only mode: "${label}" (${offending.category}) is not allowed.` };
+      }
+      return { ok: true, statements };
     }
 
-    if (category === 'write' && opts.allowWrite) {
-      // UPDATE/DELETE must have a WHERE clause
-      if (/^(update|delete)\b/i.test(stmt) && !/\bwhere\b/i.test(stmt)) {
+    // DDL is never allowed through AI tools, even in write mode.
+    const ddl = classified.find(c => c.category === 'ddl');
+    if (ddl) {
+      return { ok: false, reason: ddl.reason ?? 'DDL statements (CREATE/ALTER/DROP/TRUNCATE...) are not allowed via AI tools. Use the Sqlens UI instead.' };
+    }
+
+    const hasWrite = classified.some(c => c.category === 'write');
+    if (!hasWrite) {
+      return { ok: false, reason: 'Statement is not allowed.' };
+    }
+    if (!opts.allowWrite) {
+      return { ok: false, reason: 'Write statements are not allowed (sqlens.mcp.writeMode = "deny").' };
+    }
+
+    // Scope guards: writes must be bounded.
+    if (classifier.driverType === 'sql') {
+      const unbounded = statements.find(s => /^(update|delete)\b/i.test(s.trim()) && !/\bwhere\b/i.test(s));
+      if (unbounded) {
         return { ok: false, reason: 'UPDATE/DELETE without a WHERE clause is not allowed.' };
       }
-      return { ok: true, statements: [stmt] };
     }
-
-    if (category === 'ddl') {
-      return { ok: false, reason: 'DDL statements (CREATE/ALTER/DROP/TRUNCATE...) are not allowed via AI tools. Use the Sqlens UI instead.' };
-    }
-
-    return { ok: false, reason: `Statement type "${category}" is not allowed.` };
-  }
-
-  /** Driver-aware validation for Redis (command tables, not SQL keywords). */
-  private validateRedis(sql: string, opts: { readOnly: boolean; allowWrite: boolean }): GuardResult {
-    const lines = splitRedisCommands(sql);
-    if (lines.length === 0) {
-      return { ok: false, reason: 'Empty Redis command' };
-    }
-
-    for (const line of lines) {
-      const category = classifyRedisCommand(line);
-      if (category === 'danger') {
-        const cmd = line.split(/\s+/)[0].toUpperCase();
-        return { ok: false, reason: `Command "${cmd}" is blocked (destructive / administrative).` };
+    if (classifier.driverType === 'clickhouse') {
+      const unbounded = statements.find(s => /^ALTER\s+TABLE[\s\S]*\b(UPDATE|DELETE)\b/i.test(s.trim()) && !/\bwhere\b/i.test(s));
+      if (unbounded) {
+        return { ok: false, reason: 'ClickHouse mutations require a WHERE clause.' };
       }
-      if (opts.readOnly && category === 'write') {
-        return { ok: false, reason: `Read-only mode: write command "${line.split(/\s+/)[0]}" is not allowed.` };
-      }
-      if (category === 'write' && !opts.allowWrite && !opts.readOnly) {
-        return { ok: false, reason: `Write command "${line.split(/\s+/)[0]}" is not allowed (sqlens.mcp.writeMode = "deny").` };
+    }
+    if (classifier.driverType === 'mssql') {
+      const unbounded = statements.find(s => /^(update|delete)\b/i.test(s.trim()) && !/\bwhere\b/i.test(s));
+      if (unbounded) {
+        return { ok: false, reason: 'UPDATE/DELETE without a WHERE clause is not allowed.' };
       }
     }
 
-    return { ok: true, statements: lines };
+    return { ok: true, statements };
   }
 
   /** Mask values of columns that look sensitive. */
@@ -210,4 +128,8 @@ export class SecurityGuard {
     const m = /(?:from|into|update|join|table)\s+([`"[]?[\w$]+[`"\]]?(?:\s*\.\s*[`"[]?[\w$]+[`"\]]?)?)/i.exec(stripComments(sql));
     return m ? m[1].replace(/[`"[\]]/g, '') : undefined;
   }
+}
+
+function firstToken(text: string): string {
+  return text.trim().split(/[\s(]/)[0]?.slice(0, 40) ?? text.slice(0, 40);
 }
