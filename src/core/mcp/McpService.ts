@@ -20,6 +20,48 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Title-case a raw client identifier (e.g. `codebuddy` → `CodeBuddy`). */
+function displayClientName(raw: string): string {
+  const cleaned = raw.replace(/[\s_-]+/g, ' ').trim();
+  if (!cleaned) { return ''; }
+  // Known products keep their own casing.
+  const known: Record<string, string> = {
+    codebuddy: 'CodeBuddy',
+    'claude code': 'Claude Code',
+    claude: 'Claude',
+    cursor: 'Cursor',
+    copilot: 'GitHub Copilot',
+    'github copilot': 'GitHub Copilot',
+    trae: 'Trae',
+    'trae cn': 'Trae CN',
+    continue: 'Continue',
+    cline: 'Cline',
+    windsurf: 'Windsurf',
+    zed: 'Zed',
+  };
+  const key = cleaned.toLowerCase();
+  if (known[key]) { return known[key]; }
+  return cleaned.length <= 3
+    ? cleaned.toUpperCase()
+    : cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+/**
+ * Best-effort product name from a User-Agent header, skipping HTTP/library
+ * agents that say nothing about the assistant.
+ */
+function clientNameFromUserAgent(userAgent?: string): string {
+  if (!userAgent) { return ''; }
+  const first = userAgent.split(/[\s(]/)[0] || '';
+  const product = first.split('/')[0];
+  if (!product) { return ''; }
+  const generic = /^(node|undici|axios|fetch|got|curl|wget|python|python-requests|okhttp|java|go-http-client|mcp|modelcontextprotocol|mcp-sdk|vscode)/i;
+  if (generic.test(product)) { return ''; }
+  // Ignore a bare version-ish token.
+  if (/^[\d.]+$/.test(product)) { return ''; }
+  return displayClientName(product);
+}
+
 function textResult(data: unknown, isError = false): CallToolResult {
   return {
     content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
@@ -43,6 +85,9 @@ export class McpService {
   private guard = new SecurityGuard();
   private port = 0;
   private token = '';
+  /** Most recently seen assistant name (from initialize / User-Agent). */
+  private lastClientName = '';
+  private lastClientAt = 0;
 
   constructor(
     private connectionManager: ConnectionManager,
@@ -187,7 +232,7 @@ export class McpService {
       return;
     }
 
-    const clientName = this.extractClientName(body);
+    const clientName = this.resolveClientName(req, body);
 
     // Stateless: one transport + server instance per request
     const transport = new StreamableHTTPServerTransport({
@@ -208,10 +253,39 @@ export class McpService {
   private extractClientName(body: unknown): string {
     try {
       const info = (body as { params?: { clientInfo?: { name?: string } } }).params?.clientInfo;
-      return info?.name || 'ai-assistant';
+      const name = info?.name?.trim();
+      return name ? displayClientName(name) : '';
     } catch {
-      return 'ai-assistant';
+      return '';
     }
+  }
+
+  /**
+   * Who is calling? `clientInfo` only arrives with the `initialize` request —
+   * later `tools/call` requests carry nothing — so the name is remembered for
+   * the session (and a usable User-Agent is used as a fallback).
+   */
+  private resolveClientName(req: http.IncomingMessage, body: unknown): string {
+    const fromBody = this.extractClientName(body);
+    if (fromBody) {
+      this.lastClientName = fromBody;
+      this.lastClientAt = Date.now();
+      return fromBody;
+    }
+
+    const fromAgent = clientNameFromUserAgent(req.headers['user-agent']);
+    if (fromAgent) {
+      this.lastClientName = fromAgent;
+      this.lastClientAt = Date.now();
+      return fromAgent;
+    }
+
+    // Fall back to the most recent initialize while it is plausibly the same
+    // client (a single assistant usually drives the endpoint at a time).
+    if (this.lastClientName && Date.now() - this.lastClientAt < 30 * 60_000) {
+      return this.lastClientName;
+    }
+    return 'ai-assistant';
   }
 
   // ── Shared helpers ──

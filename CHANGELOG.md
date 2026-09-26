@@ -2,6 +2,13 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.3.3 (2026-09-26)
+
+### Improved
+
+- **AI Activity now shows the real assistant** ("CodeBuddy", "Claude Code", "GitHub Copilot", …) instead of the generic `ai-assistant`. The name comes from the `initialize` request's `clientInfo` and is remembered for the session, because later `tools/call` requests carry no client info; an unrecognised/absent name falls back to a recognised `User-Agent` product token, and common assistants keep their proper casing.
+- MCP smoke tests extended to cover the name memory and the User-Agent fallback (HTTP-library agents such as `undici` are ignored).
+
 ## 0.3.2 (2026-09-26)
 
 ### Fixed
