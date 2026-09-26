@@ -1,4 +1,4 @@
-import { Client, Pool, types } from 'pg';
+import { Client, Pool, PoolClient, types } from 'pg';
 import { BaseDriver } from './DatabaseDriver';
 import { Logger } from '../utils/Logger';
 import {
@@ -33,6 +33,8 @@ export class PostgreSQLDriver extends BaseDriver {
   private pool: Pool | null = null;
   private currentDb: string = '';
   private currentSchema: string = 'public';
+  /** Client running the active query, so cancelQuery() can target its pid. */
+  private activeClient: PoolClient | null = null;
 
   async connect(config: ConnectionConfig): Promise<void> {
     const poolConfig = {
@@ -139,8 +141,12 @@ export class PostgreSQLDriver extends BaseDriver {
     this.ensureConnected();
     const start = performance.now();
 
+    // Check out a dedicated client so the running query can be cancelled by
+    // its backend pid (pool.query hides which connection is in use).
+    const client = await this.pool!.connect();
+    this.activeClient = client;
     try {
-      const result = await this.pool!.query(sql, params);
+      const result = await client.query(sql, params);
       const executionTime = Math.round(performance.now() - start);
 
       // DDL/DML with no rows returned
@@ -190,11 +196,27 @@ export class PostgreSQLDriver extends BaseDriver {
       const errMsg = err instanceof Error ? err.message : String(err);
       Logger.getInstance().logSQL(sql, undefined, errMsg);
       throw err;
+    } finally {
+      this.activeClient = null;
+      client.release();
     }
   }
 
+  /**
+   * Cancel the running query through `pg_cancel_backend` on a second
+   * connection (PostgreSQL has no out-of-band cancel in the pg driver).
+   */
   async cancelQuery(): Promise<void> {
-    // pg supports query cancellation via the connection
+    const client = this.activeClient;
+    if (!client || !this.pool) { return; }
+    try {
+      const pid = (client as unknown as { processID?: number }).processID;
+      if (pid) {
+        await this.pool.query('SELECT pg_cancel_backend($1)', [pid]);
+      }
+    } catch {
+      // The query may have finished already — nothing to cancel.
+    }
   }
 
   async getDatabases(): Promise<DatabaseInfo[]> {

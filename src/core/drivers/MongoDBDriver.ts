@@ -304,8 +304,13 @@ export class MongoDBDriver extends BaseDriver {
     return results;
   }
 
+  /**
+   * MongoDB cancellation needs the server-side operation id (killOp), which
+   * the driver only exposes via currentOp lookups; the query is left to time
+   * out server-side instead.
+   */
   async cancelQuery(): Promise<void> {
-    // P4: killOp by operation id.
+    // no-op (see above)
   }
 
   // ── Collection management, transfer, explain (P4) ──
@@ -769,7 +774,7 @@ function inferNormalizedType(value: unknown): NormalizedColumnType {
 
 // ── mongosh-style query text parsing (structural, no eval) ──
 
-interface ParsedMongoCall {
+export interface ParsedMongoCall {
   kind: 'use' | 'call';
   database?: string;
   collection?: string;
@@ -785,7 +790,7 @@ const SUPPORTED_METHODS = new Set([
 ]);
 
 /** Parse `use <db>` or `db.<coll>.<method>(args).chain(...)` — no eval. */
-function parseMongoCall(text: string): ParsedMongoCall {
+export function parseMongoCall(text: string): ParsedMongoCall {
   const trimmed = text.trim().replace(/;\s*$/, '');
 
   const useMatch = trimmed.match(/^use\s+(\S+)$/i);

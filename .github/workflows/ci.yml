@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quality:
+    name: Type-check, build & unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Type-check
+        run: npx tsc -p tsconfig.json --noEmit
+      - name: Build extension + webview
+        run: npm run build
+      - name: Unit tests
+        run: npm run test:unit
+
+  integration:
+    name: Driver integration (service containers)
+    runs-on: ubuntu-latest
+    env:
+      SQLENS_CH_PASSWORD: voice123
+      SQLENS_MSSQL_PASSWORD: 'YourStrong!Passw0rd'
+    services:
+      elasticsearch:
+        image: elasticsearch:8.14.3
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: 'false'
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports:
+          - 9200:9200
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8
+        env:
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: voice123
+        ports:
+          - 8123:8123
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: 'YourStrong!Passw0rd'
+          MSSQL_PID: Developer
+        ports:
+          - 1433:1433
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Wait for databases
+        run: |
+          node scripts/wait-for-ports.mjs 127.0.0.1:9200 127.0.0.1:27017 127.0.0.1:8123 127.0.0.1:1433
+          sleep 20
+      - name: Run driver integration suites
+        run: ./scripts/run-integration.sh

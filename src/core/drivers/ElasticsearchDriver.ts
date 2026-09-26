@@ -243,8 +243,13 @@ export class ElasticsearchDriver extends BaseDriver {
     return results;
   }
 
+  /**
+   * Elasticsearch searches are cancellable through the tasks API, but only
+   * when the request is sent with `wait_for_completion=false`; plain
+   * requests are left to the server timeout.
+   */
   async cancelQuery(): Promise<void> {
-    // P4: task cancellation via _tasks.
+    // no-op (see above)
   }
 
   // ── Schema introspection ──
@@ -533,7 +538,7 @@ const REQUEST_LINE_RE = /^\s*(GET|POST|PUT|DELETE|HEAD)\s+\/(\S*)\s*$/im;
  * `GET /_search`), blank-line-separated JSON body afterwards. A bare JSON
  * body is treated as a search request body.
  */
-function parseRequestText(text: string): { method: string; path: string; body?: unknown } {
+export function parseRequestText(text: string): { method: string; path: string; body?: unknown } {
   const match = text.match(REQUEST_LINE_RE);
   if (!match) {
     // Bare JSON → POST /_search.

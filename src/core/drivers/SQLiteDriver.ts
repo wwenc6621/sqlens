@@ -190,6 +190,10 @@ export class SQLiteDriver extends BaseDriver {
     }
   }
 
+  /**
+   * sql.js runs synchronously in-process, so a statement cannot be
+   * interrupted mid-flight — cancellation is a no-op by design.
+   */
   async cancelQuery(): Promise<void> {
     // SQLite operations are synchronous, can't cancel
   }

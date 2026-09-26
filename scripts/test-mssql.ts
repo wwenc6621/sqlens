@@ -5,7 +5,7 @@ import type { ConnectionConfig } from '../src/core/types';
 async function main() {
   const config: ConnectionConfig = {
     id: 'test', name: 'test', type: 'mssql' as never,
-    host: '127.0.0.1', port: 1433, username: 'sa', password: 'YourStrong!Passw0rd',
+    host: '127.0.0.1', port: 1433, username: 'sa', password: process.env.SQLENS_MSSQL_PASSWORD ?? 'YourStrong!Passw0rd',
     database: 'master',
     ssl: { mode: 'disabled' } as never,
     ssh: { enabled: false, host: '', port: 22, username: '', authMethod: 'password', privateKeyPath: '' },

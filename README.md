@@ -40,6 +40,52 @@ Sqlens 是一个完全免费的 VS Code 扩展，用于浏览数据库、运行 
 | MongoDB | 已支持（官方驱动；mongosh 风格查询、文档 CRUD、JSON 导入导出、`_id` 游标深分页） |
 | SQL Server | 已支持（T-SQL；`OFFSET/FETCH` 分页、多结果集页签、`bcp` 高速导出、NTLM/Azure AD 认证） |
 
+## 各驱动的查询写法
+
+Sqlens 直接复用同一个编辑器/结果面板，但每种连接的查询文本不同：
+
+**MySQL / MariaDB / PostgreSQL / SQLite / ClickHouse**
+
+```sql
+SELECT id, name FROM users WHERE status = 'active' ORDER BY id LIMIT 100;
+```
+
+**SQL Server**
+
+```sql
+SELECT TOP 100 id, name FROM dbo.users ORDER BY id;
+-- 或分页：ORDER BY id OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY
+```
+
+**Elasticsearch**（Kibana Dev Tools 风格：首行 `METHOD /路径`，空行后是 JSON body；只写 JSON 则视为搜索）
+
+```
+GET /my-index/_search
+{
+  "query": { "match": { "title": "error" } },
+  "sort": [{ "@timestamp": "desc" }],
+  "size": 100
+}
+```
+
+聚合结果会按桶展开成行，并附带 `bar` 条形列便于观察分布。
+
+**MongoDB**（mongosh 风格，支持 `ObjectId('...')` / `ISODate('...')`；不会执行任意 JS）
+
+```javascript
+db.orders.find({ status: 'PAID' }).sort({ createdAt: -1 }).limit(100)
+db.orders.countDocuments({ status: 'PAID' })
+db.orders.aggregate([{ $group: { _id: '$status', n: { $sum: 1 } } }])
+db.orders.updateOne({ _id: ObjectId('...') }, { $set: { status: 'PAID' } })
+```
+
+**Redis**（每行一条命令）
+
+```
+SCAN 0 MATCH user:* COUNT 100
+HGETALL user:1
+```
+
 ## 快速开始
 
 1. 从 [VS Code 插件市场](https://marketplace.visualstudio.com/items?itemName=wwenc6621.sqlens-vscode) 安装。

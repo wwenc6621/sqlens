@@ -15,6 +15,11 @@ import { Logger } from '../utils/Logger';
 
 const DEFAULT_PORT = 37421;
 
+/** Escape a string for use inside a RegExp. */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function textResult(data: unknown, isError = false): CallToolResult {
   return {
     content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
@@ -238,7 +243,40 @@ export class McpService {
     if (!driver || !driver.isConnected) {
       throw new Error(`Connection "${config.name || config.host}" is not connected. Connect it in Sqlens first.`);
     }
+
+    // Connection allow-list: an empty list means "all connections".
+    const allowed = vscode.workspace.getConfiguration('sqlens.mcp').get<string[]>('allowedConnections', []) || [];
+    if (allowed.length > 0) {
+      const name = config.name || config.host;
+      const permitted = allowed.some(entry => entry === config!.id || entry.toLowerCase() === name.toLowerCase());
+      if (!permitted) {
+        this.activity.recordBlocked('access', 'mcp', `connection ${name}`, 'not in sqlens.mcp.allowedConnections');
+        throw new Error(`Connection "${name}" is not in the allowed list (sqlens.mcp.allowedConnections).`);
+      }
+    }
+
     return { id: config.id, name: config.name || config.host, driver };
+  }
+
+  /**
+   * Refuse statements touching a table/collection listed in
+   * `sqlens.mcp.blockedTables` (matched case-insensitively on the name).
+   */
+  private assertTableAllowed(text: string, driver: DatabaseDriver): void {
+    const blocked = (vscode.workspace.getConfiguration('sqlens.mcp').get<string[]>('blockedTables', []) || [])
+      .map(entry => entry.trim().toLowerCase())
+      .filter(Boolean);
+    if (blocked.length === 0) { return; }
+
+    const table = this.guard.extractTable(text)?.toLowerCase();
+    const haystack = text.toLowerCase();
+    const hit = blocked.find(name => (table && (table === name || table.endsWith(`.${name}`))) || new RegExp(`[\\s.[\`"']${escapeRegExp(name)}[\\s.\`"'(]`).test(haystack));
+    if (hit) {
+      this.activity.recordBlocked('access', 'mcp', hit, 'listed in sqlens.mcp.blockedTables');
+      throw new Error(`Table "${hit}" is blocked by sqlens.mcp.blockedTables.`);
+    }
+
+    void driver;
   }
 
   private recordAiHistory(sql: string, connectionId: string, executionTime: number, rowCount: number, success: boolean, error?: string): void {
@@ -449,6 +487,7 @@ export class McpService {
           const guard = this.guard.validate(args.sql, { readOnly: true, allowWrite: false, driverType });
           if (!guard.ok) { throw new Error(guard.reason); }
           const sql = isSqlFamily(driverType) ? guard.statements![0] : args.sql;
+          this.assertTableAllowed(sql, conn.driver);
           const touchedTable = this.guard.extractTable(sql);
           if (touchedTable) { this.revealTable?.(touchedTable, conn.id); }
           const maxRows = Math.min(args.maxRows ?? maxRowsDefault, 1000);
@@ -488,6 +527,56 @@ export class McpService {
       },
     );
 
+    // ── explain_query ──
+    mcp.tool(
+      'explain_query',
+      'Get the execution plan of a read query WITHOUT executing it. '
+      + 'SQL connections use EXPLAIN (SQLite: EXPLAIN QUERY PLAN); ClickHouse uses EXPLAIN; '
+      + 'SQL Server runs SET STATISTICS PROFILE; MongoDB explains a find/aggregate call; '
+      + 'Elasticsearch profiles a search request.',
+      {
+        connectionId: z.string().optional().describe('Connection id from list_connections.'),
+        sql: z.string().describe('The read statement/request to explain (not executed).'),
+      },
+      async (args) => {
+        const result = await withActivity('explain_query', args, async () => {
+          const conn = await this.getDriver(args.connectionId);
+          const driverType = conn.driver.driverType;
+          const guard = this.guard.validate(args.sql, { readOnly: true, allowWrite: false, driverType });
+          if (!guard.ok) { throw new Error(guard.reason); }
+          const text = driverType === 'elasticsearch' || driverType === 'mongodb'
+            ? args.sql
+            : guard.statements![0];
+          this.assertTableAllowed(text, conn.driver);
+
+          const driverObj = conn.driver as unknown as Record<string, (...a: unknown[]) => Promise<any>>;
+
+          switch (driverType) {
+            case 'mssql': {
+              const res = await driverObj.explainQuery(text);
+              return { plan: (res.rows as unknown[][]).map(row => row.map(String).join(' | ')).join('\n') };
+            }
+            case 'mongodb': {
+              const res = await driverObj.explainQuery(text);
+              return { plan: res.rows[0]?.[0], note: 'Use db.<coll>.find(...) or .aggregate(...).' };
+            }
+            case 'elasticsearch': {
+              const index = text.match(/^\s*(?:GET|POST)\s+\/?([^/\s?]+)\/_search/i)?.[1] || '_all';
+              const body = text.match(/\{[\s\S]*\}\s*$/)?.[0] || '';
+              const res = await driverObj.explainSearch(index, body);
+              return { plan: res.rows[0]?.[0], columns: res.columns.map((c: { name: string }) => c.name) };
+            }
+            default: {
+              const prefix = driverType === 'sqlite' ? 'EXPLAIN QUERY PLAN ' : 'EXPLAIN ';
+              const res = await conn.driver.query(`${prefix}${text}`);
+              return { columns: res.columns.map(c => c.name), rows: res.rows };
+            }
+          }
+        }, { sql: args.sql, connectionId: args?.connectionId });
+        return textResult(result);
+      },
+    );
+
     // ── write_query ──
     mcp.tool(
       'write_query',
@@ -520,6 +609,7 @@ export class McpService {
           return textResult({ ok: false, error: guard.reason }, true);
         }
         const sql = isSqlFamily(driverType) ? guard.statements![0] : args.sql;
+        this.assertTableAllowed(sql, guardConn.driver);
 
         if (writeMode === 'confirm') {
           const conn = await this.connectionManager.getSavedConnections().then(cs => cs.find(c => c.id === args.connectionId));

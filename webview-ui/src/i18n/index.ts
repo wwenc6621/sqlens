@@ -205,6 +205,25 @@ const zh: Record<string, string> = {
   'Open a table or run a query to get started': '打开一张表或运行一个查询即可开始',
   // QueryPlan
   'Query Plan': '执行计划',
+  // Redis connection form
+  'Redis Mode': 'Redis 模式',
+  'Standalone': '单机',
+  'Cluster': '集群',
+  'Sentinel': '哨兵',
+  'Cluster Nodes (one host:port per line)': '集群节点（每行一个 host:port）',
+  'Sentinel Nodes (one host:port per line)': '哨兵节点（每行一个 host:port）',
+  'Master Name': '主节点名称',
+  'DB Index': '数据库索引',
+  // MCP panel
+  'Access Mode: Read-only': '访问模式：只读',
+  'Access Mode: Read & Write': '访问模式：读写',
+  'Endpoint & Token': '端点与令牌',
+  'Copy Endpoint': '复制端点',
+  'Copy MCP Config': '复制 MCP 配置',
+  'Copy full MCP config JSON (endpoint + bearer token)': '复制完整 MCP 配置 JSON（端点 + bearer 令牌）',
+  // Structure view / data grid
+  'Double-click Name / Type / Default / Comment to edit inline. Nullable toggles directly. Apply changes with Generate SQL / Execute above.': '双击“名称 / 类型 / 默认值 / 注释”可就地编辑，可空列可直接切换。改完后用上方的“生成 SQL / 执行”应用。',
+  'Searching within the current page...': '正在当前页内搜索…',
   // ConnectionForm — dialect-specific options
   'SQL Server TLS': 'SQL Server TLS',
   'Encrypt connection (required by Azure SQL)': '加密连接（Azure SQL 必需）',

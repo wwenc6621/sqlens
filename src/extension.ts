@@ -633,6 +633,9 @@ export function activate(context: vscode.ExtensionContext) {
     () => mcpService?.endpoint || '',
     () => (mcpService && extensionContext ? mcpService.getAuthToken(extensionContext) : ''),
   );
+  // Created unconditionally above; the local alias carries the non-optional
+  // type so the MCP wiring below doesn't need `!` everywhere.
+  const mcpServer = mcpService!;
 
   /** Push the current activity snapshot into the AI Activity tab (creating it on first use). */
   function postAiActivityData(activate: boolean) {
@@ -787,18 +790,18 @@ export function activate(context: vscode.ExtensionContext) {
 
   const mcpEnabled = vscode.workspace.getConfiguration('sqlens.mcp').get<boolean>('enabled', true);
   if (mcpEnabled) {
-    void mcpService.start(context);
+    void mcpServer.start(context);
     // The MCP Server panel is opened on demand only (title-bar button or
     // command palette) — never automatically on startup.
   }
 
   // Refresh the MCP panel whenever the server starts/stops or the token changes.
-  context.subscriptions.push(mcpService.onDidChangeStatus(() => {
-    void vscode.commands.executeCommand('setContext', 'sqlens.mcpRunning', mcpService.running);
+  context.subscriptions.push(mcpServer.onDidChangeStatus(() => {
+    void vscode.commands.executeCommand('setContext', 'sqlens.mcpRunning', mcpServer.running);
     if (panelTabHandlers.has(MCP_TAB_ID)) { postMcpStatus(false); }
   }));
   // Seed the title-bar icon state so the running (green) icon shows immediately.
-  void vscode.commands.executeCommand('setContext', 'sqlens.mcpRunning', mcpService.running);
+  void vscode.commands.executeCommand('setContext', 'sqlens.mcpRunning', mcpServer.running);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('sqlens.mcp.register', () => mcpRegistrar?.registerInteractive()),
@@ -815,8 +818,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showWarningMessage(t('MCP server is not running.'));
         return;
       }
-      void vscode.env.clipboard.writeText(mcpService.endpoint);
-      vscode.window.showInformationMessage(t('Copied: {0}', mcpService.endpoint));
+      void vscode.env.clipboard.writeText(mcpServer.endpoint);
+      vscode.window.showInformationMessage(t('Copied: {0}', mcpServer.endpoint));
     }),
     vscode.commands.registerCommand('sqlens.mcp.showActivity', () => postAiActivityData(true)),
     vscode.commands.registerCommand('sqlens.mcp.openPanel', () => postMcpStatus(true)),
@@ -2258,6 +2261,42 @@ export function activate(context: vscode.ExtensionContext) {
           }
         },
       );
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.generateTestData', async (item?: any) => {
+      const connectionId = item?.connectionId || item?.config?.id || connectionManager.activeConnectionId;
+      const tableInfo = item?.tableInfo;
+      if (!connectionId || !tableInfo) {
+        vscode.window.showErrorMessage(t('No table selected.'));
+        return;
+      }
+      const driver = connectionManager.getDriver(connectionId);
+      if (!driver) { vscode.window.showErrorMessage(t('Not connected.')); return; }
+
+      const input = await vscode.window.showInputBox({
+        prompt: t('How many rows to generate?'),
+        value: '20',
+        validateInput: value => (/^\d+$/.test(value) && Number(value) > 0 && Number(value) <= 1000)
+          ? undefined
+          : t('Enter a number between 1 and 1000'),
+      });
+      if (!input) { return; }
+
+      try {
+        const columns = await driver.getColumns(tableInfo.name, tableInfo.schema);
+        const sql = generateTestDataSql(driver, tableInfo.name, tableInfo.schema, columns, Number(input));
+        if (sql.length === 0) {
+          vscode.window.showWarningMessage(t('No writable columns found on this table.'));
+          return;
+        }
+        const doc = await vscode.workspace.openTextDocument({ language: 'sql', content: `${sql.join('\n')}\n` });
+        await vscode.window.showTextDocument(doc);
+        vscode.window.showInformationMessage(t('Generated {0} INSERT statements — review, then run.', sql.length));
+      } catch (err) {
+        vscode.window.showErrorMessage(t('Failed to generate data: {0}', err));
+      }
     }),
   );
 
@@ -5009,6 +5048,49 @@ export function deactivate() {
   connectionManager?.dispose();
   webviewManager?.disposeAll();
   queryHistory?.dispose();
+}
+
+/**
+ * Build INSERT statements with type-appropriate sample values for a table,
+ * skipping identity/auto-increment columns. Returns one statement per row.
+ */
+function generateTestDataSql(
+  driver: DatabaseDriver,
+  table: string,
+  schema: string | undefined,
+  columns: Array<{ name: string; normalizedType: string; isAutoIncrement?: boolean; enumValues?: string[] }>,
+  rowCount: number,
+): string[] {
+  const writable = columns.filter(col => !col.isAutoIncrement);
+  if (writable.length === 0) { return []; }
+
+  const target = schema
+    ? `${driver.escapeIdentifier(schema)}.${driver.escapeIdentifier(table)}`
+    : driver.escapeIdentifier(table);
+  const columnList = writable.map(col => driver.escapeIdentifier(col.name)).join(', ');
+
+  const statements: string[] = [];
+  for (let row = 0; row < rowCount; row++) {
+    const values = writable.map(col => {
+      switch (col.normalizedType) {
+        case 'integer': return driver.escapeValue(1000 + row);
+        case 'float':
+        case 'decimal': return driver.escapeValue(Number((10 + row * 1.5).toFixed(2)));
+        case 'boolean': return driver.escapeValue(row % 2 === 0);
+        case 'date': return driver.escapeValue(new Date(Date.now() + row * 86_400_000).toISOString().slice(0, 10));
+        case 'datetime':
+        case 'timestamp': return driver.escapeValue(new Date(Date.now() + row * 3_600_000).toISOString().replace('T', ' ').slice(0, 19));
+        case 'uuid': return driver.escapeValue(uuidv4());
+        case 'json':
+        case 'array': return driver.escapeValue('{}');
+        case 'enum': return driver.escapeValue(col.enumValues?.length ? col.enumValues[row % col.enumValues.length] : `value_${row + 1}`);
+        case 'binary': return driver.escapeValue(null);
+        default: return driver.escapeValue(`${col.name}_${row + 1}`);
+      }
+    });
+    statements.push(`INSERT INTO ${target} (${columnList}) VALUES (${values.join(', ')});`);
+  }
+  return statements;
 }
 
 /**

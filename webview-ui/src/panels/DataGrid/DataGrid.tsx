@@ -2000,7 +2000,7 @@ export default function DataGrid({ instanceId = 'default' }: { instanceId?: stri
             </div>
           )}
           <span className="row-count">
-            {rowFilterApplying ? 'Đang tìm kiếm trên trang hiện tại...' : `${visibleRowsCount.toLocaleString()} rows`}
+            {rowFilterApplying ? t('Searching within the current page...') : `${visibleRowsCount.toLocaleString()} rows`}
           </span>
         </div>
         <div className="toolbar-right">

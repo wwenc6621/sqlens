@@ -2,6 +2,26 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.3.1 (2026-09-26)
+
+### Testing & CI
+
+- **GitHub Actions CI**: a quality job (type-check, extension + webview build, unit tests) and an integration job that starts Elasticsearch / MongoDB / ClickHouse / SQL Server service containers and runs every driver suite (`scripts/run-integration.sh`, credentials via `SQLENS_CH_PASSWORD` / `SQLENS_MSSQL_PASSWORD`).
+- **Offline unit tests** (`npm run test:unit`, Node's built-in test runner, no extra dependencies): statement classification for all five drivers, ClickHouse/ES/T-SQL type normalization, Elasticsearch request parsing, mongosh call parsing, and an i18n coverage guard.
+- The suite immediately caught three real defects, all fixed here: SQL Server `DROP DATABASE/TABLE` was not classified as danger, Elasticsearch's indexed read paths (`POST /idx/_search`) were misclassified as writes for AI calls, and 16 webview strings had no Chinese translation.
+
+### Robustness
+
+- **Query cancellation** now works on PostgreSQL (`pg_cancel_backend`), MySQL (`KILL QUERY`) and SQL Server (`request.cancel()`), joining ClickHouse's `KILL QUERY`; SQLite/MongoDB/Elasticsearch document why cancellation is not offered.
+- Fixed a long-standing type error around the optional MCP service reference and a stray Vietnamese string in the data grid.
+
+### MCP & data tooling
+
+- New **`explain_query`** MCP tool: returns an execution plan without executing the query (EXPLAIN / EXPLAIN QUERY PLAN / SET STATISTICS PROFILE / `cursor.explain()` / ES `profile`).
+- New AI access controls: `sqlens.mcp.allowedConnections` (ids or names; empty = all) and `sqlens.mcp.blockedTables` (tables/collections/indexes the AI may never touch), enforced on every read and write tool call.
+- **Generate Test Data (INSERT)**: right-click a table to generate type-appropriate INSERT statements (identity columns skipped) into a new editor for review.
+- README (both languages) documents the query syntax for every driver.
+
 ## 0.3.0 (2026-09-26)
 
 ### Fixed

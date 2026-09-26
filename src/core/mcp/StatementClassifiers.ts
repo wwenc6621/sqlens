@@ -125,6 +125,9 @@ export const mssqlClassifier: StatementClassifier = {
     if (/^BULK\s+INSERT\b/i.test(clean)) {
       return { text: stmt, category: 'danger', reason: 'BULK INSERT is refused.' };
     }
+    if (/^DROP\s+(DATABASE|TABLE)\b/i.test(clean)) {
+      return { text: stmt, category: 'danger', reason: 'DROP DATABASE/TABLE is refused for AI calls.' };
+    }
     if (/^(BACKUP|RESTORE)\b/i.test(clean)) {
       return { text: stmt, category: 'danger', reason: 'BACKUP/RESTORE is refused.' };
     }
@@ -156,7 +159,8 @@ export const redisClassifier: StatementClassifier = {
 
 // ── Elasticsearch ────────────────────────────────────────────────────────────
 
-const ES_READ_PATHS = /^\/(_search|_count|_msearch|_mget|_explain|_field_caps|_cat\/|_analyze|_validate|_search\/scroll)/;
+// Matches anywhere after the index name (e.g. `POST /idx/_search`).
+const ES_READ_PATHS = /\/(_search|_count|_msearch|_mget|_explain|_field_caps|_cat\/|_analyze|_validate)(\/|\?|$)/;
 const ES_DANGER_PATHS = /\/(_delete_by_query|_close|_flush|_cache\/clear|_cluster\/|_reindex|_forcemerge|_shrink|_snapshot\/)/;
 
 /**

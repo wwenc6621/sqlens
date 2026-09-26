@@ -36,6 +36,8 @@ export class MSSQLDriver extends BaseDriver {
   private currentDb: string = '';
   /** Primary key per `schema.table`, captured by getPrimaryKey for paging. */
   private pkCache = new Map<string, string[]>();
+  /** In-flight request, cancellable through tedious. */
+  private activeRequest?: mssql.Request;
 
   async connect(config: ConnectionConfig): Promise<void> {
     try {
@@ -89,8 +91,10 @@ export class MSSQLDriver extends BaseDriver {
     this.ensureConnected();
     const start = performance.now();
 
+    const request = this.pool!.request();
+    this.activeRequest = request;
     try {
-      const res = await this.pool!.request().query(sql);
+      const res = await request.query(sql);
       const executionTime = Math.round(performance.now() - start);
       Logger.getInstance().logSQL(sql, executionTime);
 
@@ -192,6 +196,8 @@ export class MSSQLDriver extends BaseDriver {
       const errMsg = err instanceof Error ? err.message : String(err);
       Logger.getInstance().logSQL(sql, undefined, errMsg);
       throw err;
+    } finally {
+      this.activeRequest = undefined;
     }
   }
 
@@ -207,8 +213,13 @@ export class MSSQLDriver extends BaseDriver {
     return results;
   }
 
+  /** Cancel the running request (tedious supports out-of-band cancellation). */
   async cancelQuery(): Promise<void> {
-    // P2: track the live request and call request.cancel().
+    try {
+      this.activeRequest?.cancel();
+    } catch {
+      // The request may have completed already.
+    }
   }
 
   // ── Schema introspection ──

@@ -40,6 +40,55 @@ It works in VS Code and VS Code forks such as Trae, and the UI follows your edit
 | MongoDB | Supported (official driver; mongosh-style queries, document CRUD, JSON export/import, `_id` cursor deep paging) |
 | SQL Server | Supported (T-SQL; `OFFSET/FETCH` paging, multi-result-set tabs, `bcp` export, NTLM/Azure AD auth) |
 
+## Query syntax per driver
+
+Every connection shares the same editor and result panel, but the query text
+differs per engine:
+
+**MySQL / MariaDB / PostgreSQL / SQLite / ClickHouse**
+
+```sql
+SELECT id, name FROM users WHERE status = 'active' ORDER BY id LIMIT 100;
+```
+
+**SQL Server**
+
+```sql
+SELECT TOP 100 id, name FROM dbo.users ORDER BY id;
+-- or: ORDER BY id OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY
+```
+
+**Elasticsearch** (Kibana Dev Tools style: `METHOD /path` first, then a JSON
+body; a bare JSON body is treated as a search)
+
+```
+GET /my-index/_search
+{
+  "query": { "match": { "title": "error" } },
+  "sort": [{ "@timestamp": "desc" }],
+  "size": 100
+}
+```
+
+Aggregation responses are flattened to one row per bucket with a `bar` column.
+
+**MongoDB** (mongosh style with `ObjectId('...')` / `ISODate('...')`; no
+arbitrary JS is ever executed)
+
+```javascript
+db.orders.find({ status: 'PAID' }).sort({ createdAt: -1 }).limit(100)
+db.orders.countDocuments({ status: 'PAID' })
+db.orders.aggregate([{ $group: { _id: '$status', n: { $sum: 1 } } }])
+db.orders.updateOne({ _id: ObjectId('...') }, { $set: { status: 'PAID' } })
+```
+
+**Redis** (one command per line)
+
+```
+SCAN 0 MATCH user:* COUNT 100
+HGETALL user:1
+```
+
 ## Getting Started
 
 1. Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=wwenc6621.sqlens-vscode).

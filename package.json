@@ -2,7 +2,7 @@
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
   "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis/ClickHouse/Elasticsearch/MongoDB/SQL Server connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
@@ -597,6 +597,11 @@
         "command": "sqlens.mssqlBcpExport",
         "title": "%SQL Server: High-speed Export (bcp)...%",
         "category": "%Sqlens%"
+      },
+      {
+        "command": "sqlens.generateTestData",
+        "title": "%Generate Test Data (INSERT)...%",
+        "category": "%Sqlens%"
       }
     ],
     "menus": {
@@ -870,6 +875,11 @@
           "group": "1_view@3"
         },
         {
+          "command": "sqlens.generateTestData",
+          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
+          "group": "1_view@4"
+        },
+        {
           "command": "sqlens.renameTable",
           "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
           "group": "2_actions@3"
@@ -1062,6 +1072,22 @@
           "default": true,
           "description": "%Store connection passwords inside the shared config file (needed for passwords to sync across IDEs)%"
         },
+        "sqlens.mcp.allowedConnections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "%Connections the AI may use (ids or names). Empty allows every connection%"
+        },
+        "sqlens.mcp.blockedTables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "%Tables/collections/indexes the AI may never touch, matched by name%"
+        },
         "sqlens.mcp.autoOpenActivity": {
           "type": "boolean",
           "default": true,
@@ -1208,6 +1234,7 @@
     "build:webview": "cd webview-ui && npm run build",
     "watch": "npm run build:ext -- --watch --sourcemap",
     "dev": "concurrently \"npm run watch\" \"cd webview-ui && npm run dev\"",
+    "test:unit": "esbuild tests/unit.test.ts --bundle --platform=node --format=cjs --alias:vscode=./src/shims/vscode.ts --alias:apache-arrow/Arrow.node=./src/shims/apache-arrow.ts --outfile=dist-tests/unit.test.cjs && node --test dist-tests/unit.test.cjs",
     "lint": "eslint src/ --ext .ts",
     "compile:tests": "tsc -p tsconfig.json",
     "test": "npm run compile:tests && node ./dist/test/runTest.js",

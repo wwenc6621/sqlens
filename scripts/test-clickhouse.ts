@@ -5,7 +5,7 @@ import type { ConnectionConfig } from '../src/core/types';
 async function main() {
   const config: ConnectionConfig = {
     id: 'test', name: 'test', type: 'clickhouse' as never,
-    host: '127.0.0.1', port: 8123, username: 'default', password: 'voice123',
+    host: '127.0.0.1', port: 8123, username: 'default', password: process.env.SQLENS_CH_PASSWORD ?? 'voice123',
     database: '',
     ssl: { mode: 'disabled' } as never,
     ssh: { enabled: false, host: '', port: 22, username: '', authMethod: 'password', privateKeyPath: '' },

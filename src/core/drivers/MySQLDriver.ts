@@ -24,6 +24,8 @@ export class MySQLDriver extends BaseDriver {
 
   private pool: mysql.Pool | null = null;
   private currentDb: string = '';
+  /** Connection thread running the active query, for KILL QUERY cancellation. */
+  private activeThreadId?: number;
 
   async connect(config: ConnectionConfig): Promise<void> {
     const poolConfig: mysql.PoolOptions = {
@@ -143,6 +145,7 @@ export class MySQLDriver extends BaseDriver {
       if (this.currentDb) {
         await conn.query(`USE ${this.escapeIdentifier(this.currentDb)}`);
       }
+      this.activeThreadId = (conn as unknown as { threadId?: number }).threadId;
       const [rows, fields] = await conn.query(sql, params);
       const executionTime = Math.round(performance.now() - start);
 
@@ -196,13 +199,21 @@ export class MySQLDriver extends BaseDriver {
       Logger.getInstance().logSQL(sql, undefined, errMsg);
       throw err;
     } finally {
+      this.activeThreadId = undefined;
       conn.release();
     }
   }
 
+  /** Cancel the running statement with KILL QUERY on a second connection. */
   async cancelQuery(): Promise<void> {
-    // MySQL cancellation requires killing the connection thread
-    // For now, this is a no-op; full implementation would use KILL QUERY
+    const threadId = this.activeThreadId;
+    if (!this.pool || !threadId) { return; }
+    try {
+      // KILL QUERY stops the statement but keeps the connection usable.
+      await this.pool.query(`KILL QUERY ${Number(threadId)}`);
+    } catch {
+      // The statement may have already completed.
+    }
   }
 
   async getDatabases(): Promise<DatabaseInfo[]> {

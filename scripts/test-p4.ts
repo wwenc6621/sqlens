@@ -94,7 +94,7 @@ async function mongo() {
 
 async function clickhouse() {
   const d = new ClickHouseDriver();
-  await d.connect(cfg('clickhouse', { port: 8123, username: 'default', password: 'voice123', database: 'default' }));
+  await d.connect(cfg('clickhouse', { port: 8123, username: 'default', password: process.env.SQLENS_CH_PASSWORD ?? 'voice123', database: 'default' }));
   await d.query('CREATE DATABASE IF NOT EXISTS sqlens_test');
   await d.switchDatabase('sqlens_test');
 
@@ -117,7 +117,7 @@ async function clickhouse() {
 async function mssql() {
   const d = new MSSQLDriver();
   await d.connect(cfg('mssql', {
-    port: 1433, username: 'sa', password: 'YourStrong!Passw0rd', database: 'master',
+    port: 1433, username: 'sa', password: process.env.SQLENS_MSSQL_PASSWORD ?? 'YourStrong!Passw0rd', database: 'master',
     options: { trustServerCertificate: true },
   }));
 
