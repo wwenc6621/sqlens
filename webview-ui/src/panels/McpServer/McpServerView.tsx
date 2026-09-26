@@ -50,6 +50,7 @@ export default function McpServerView({ instanceId = 'mcp-server' }: { instanceI
   const copyConfig = () => post({ type: 'mcpCopyConfig' });
   const register = () => post({ type: 'mcpRegister' });
   const toggleReadOnly = () => post({ type: 'mcpToggleReadOnly', data: { readOnly: !data?.readOnly } });
+  const toggleAutoApprove = () => post({ type: 'mcpToggleAutoApprove', data: { autoApprove: data?.writeMode !== 'allow' } });
   const openActivity = () => post({ type: 'mcpOpenActivity' });
 
   if (!data) {
@@ -65,6 +66,8 @@ export default function McpServerView({ instanceId = 'mcp-server' }: { instanceI
 
   const statusClass = data.running ? 'running' : 'stopped';
   const tokenDisplay = revealToken ? data.token : '•'.repeat(Math.min(24, Math.max(12, data.token.length)));
+  // `writeMode: 'allow'` means writes run without asking; 'confirm' asks.
+  const autoApprove = data.writeMode === 'allow';
 
   return (
     <div className="mcp-panel">
@@ -74,13 +77,28 @@ export default function McpServerView({ instanceId = 'mcp-server' }: { instanceI
             <Icon name="dot" size={12} className="mcp-dot" />
             <span>{data.running ? t('Running') : t('Stopped')}</span>
           </div>
+          {/* Switch is on = Read & Write; off = Read-only (matches the label). */}
           <label
             className="mcp-switch"
             title={data.readOnly ? t('Access Mode: Read-only') : t('Access Mode: Read & Write')}
           >
-            <input type="checkbox" checked={data.readOnly} onChange={toggleReadOnly} />
+            <input type="checkbox" checked={!data.readOnly} onChange={toggleReadOnly} />
             <span className="mcp-switch-track"><span className="mcp-switch-thumb" /></span>
             <span className="mcp-switch-label">{data.readOnly ? t('Read-only') : t('Read & Write')}</span>
+          </label>
+          <label
+            className={`mcp-switch${autoApprove ? ' danger' : ''}${data.readOnly ? ' disabled' : ''}`}
+            title={data.readOnly
+              ? t('Switch to Read & Write first to enable writes')
+              : (autoApprove
+                ? t('Writes execute without confirmation')
+                : t('Every write asks for confirmation'))}
+          >
+            <input type="checkbox" checked={autoApprove} disabled={data.readOnly} onChange={toggleAutoApprove} />
+            <span className="mcp-switch-track"><span className="mcp-switch-thumb" /></span>
+            <span className="mcp-switch-label">
+              {autoApprove ? t('Auto-approve') : t('Confirm writes')}
+            </span>
           </label>
         </div>
         <div className="mcp-header-actions">
@@ -106,6 +124,15 @@ export default function McpServerView({ instanceId = 'mcp-server' }: { instanceI
         <div className="mcp-banner">
           <Icon name="lock" size={13} />
           <span>{t('MCP server is disabled in settings (sqlens.mcp.enabled). You can still start it manually below.')}</span>
+        </div>
+      )}
+
+      {autoApprove && !data.readOnly && (
+        <div className="mcp-banner danger">
+          <Icon name="zap" size={13} />
+          <span>
+            {t('Auto-approve is on: AI writes (INSERT/UPDATE/DELETE/CREATE/ALTER) run without confirmation. DROP and TRUNCATE are still blocked.')}
+          </span>
         </div>
       )}
 

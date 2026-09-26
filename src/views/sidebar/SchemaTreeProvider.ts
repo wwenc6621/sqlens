@@ -5,6 +5,7 @@ import { TableInfo, ColumnInfo, DatabaseType } from '../../core/types';
 import type { MySQLDriver } from '../../core/drivers/MySQLDriver';
 import type { RedisDriver } from '../../core/drivers/RedisDriver';
 import { isRedisGroup, encodeRedisKeyTable } from '../../core/drivers/redisTableEncoding';
+import { SchemaNode } from '../schema/schemaNodes';
 
 type SchemaTreeItem = SchemaGroupItem | TableGroupItem | TableItem | ColumnItem | RedisKeyItem;
 
@@ -49,7 +50,7 @@ class TableItem extends vscode.TreeItem {
 
     const parts: string[] = [];
     if (tableInfo.rowCount !== undefined) {
-      parts.push(t('~{0} rows', `~${this.formatNumber(tableInfo.rowCount)}`));
+      parts.push(t('{0} rows', this.formatNumber(tableInfo.rowCount)));
     }
     // Prefer the table comment over the storage engine, and fall back to the
     // engine when the table has no comment.
@@ -187,8 +188,8 @@ class RedisKeyItem extends vscode.TreeItem {
     public readonly keyName: string,
     public readonly keyType: string,
     connectionId: string,
-    ttl: number,
-    size: number,
+    public readonly ttl: number,
+    public readonly size: number,
   ) {
     super(keyName, vscode.TreeItemCollapsibleState.None);
     this.iconPath = new vscode.ThemeIcon('symbol-variable', new vscode.ThemeColor('charts.red'));
@@ -229,6 +230,7 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
 
   constructor(private connectionManager: ConnectionManager) {
     connectionManager.onActiveConnectionChanged(() => {
+      // Cached tables belong to the previous database.
       this.clearCache();
       this.refresh();
     });
@@ -258,17 +260,165 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
     return element;
   }
 
-  async findTableItem(tableName: string, connectionId: string, schema?: string): Promise<SchemaTreeItem | undefined> {
-    const groups = await this.getTableGroups(connectionId, schema);
-    for (const group of groups) {
-      if (group instanceof TableGroupItem) {
-        const table = group.tables.find(t => t.name === tableName && (t.schema || '') === (schema || ''));
-        if (table) {
-          return new TableItem(table, connectionId);
-        }
+  // ── Serializable API for the Schema webview view ──
+  //
+  // The Schema sidebar is a webview now, so it cannot consume `TreeItem`s.
+  // These two methods expose the exact same cached data as plain objects; the
+  // TreeDataProvider implementation below is kept so the loading/refresh
+  // plumbing (and its many callers in extension.ts) stays untouched.
+
+  /** Root nodes: PostgreSQL schema groups, or the Tables/Views groups. */
+  async getRootNodes(): Promise<SchemaNode[]> {
+    const conn = this.connectionManager.activeConnection;
+    const connectionId = this.connectionManager.activeConnectionId;
+    if (!conn || !connectionId) { return []; }
+
+    if (conn.config.type === DatabaseType.PostgreSQL) {
+      try {
+        const schemas = await conn.driver.getSchemas();
+        return schemas.map(s => this.schemaGroupNode(s.name, connectionId));
+      } catch {
+        // Fall through to the flat Tables/Views groups.
       }
     }
-    return undefined;
+
+    const groups = await this.getTableGroups(connectionId);
+    return groups.map(g => this.toNode(g, connectionId));
+  }
+
+  /** Children of a node previously returned by `getRootNodes`/`getChildNodes`. */
+  async getChildNodes(node: SchemaNode): Promise<SchemaNode[]> {
+    if (node.kind === 'schemaGroup') {
+      const groups = await this.getTableGroups(node.connectionId, node.schema);
+      return groups.map(g => this.toNode(g, node.connectionId));
+    }
+
+    if (node.kind === 'tableGroup') {
+      const groups = await this.getTableGroups(node.connectionId, node.schema);
+      const group = groups.find(
+        (g): g is TableGroupItem => g instanceof TableGroupItem && g.groupType === node.groupType,
+      );
+      if (!group) { return []; }
+      return group.tables.map(table => this.toNode(new TableItem(table, node.connectionId), node.connectionId));
+    }
+
+    if (node.kind === 'table') {
+      const table = node.tableInfo;
+      if (!table) { return []; }
+      const conn = this.connectionManager.activeConnection;
+      if (conn?.config.type === DatabaseType.Redis && isRedisGroup(table.name)) {
+        const keys = await this.getRedisKeys(table.name, node.connectionId);
+        // Prefix the id with the parent so a Redis key and a table of the same
+        // name cannot collide.
+        return keys.map(key => ({ ...this.toNode(key, node.connectionId), id: `${node.id}>${key.keyName}` }));
+      }
+      const columns = await this.getColumnsForTable(table.name, node.connectionId, table.schema);
+      return columns.map(column => ({ ...this.toNode(column, node.connectionId), id: `${node.id}>${column.column.name}` }));
+    }
+
+    return [];
+  }
+
+  private schemaGroupNode(schemaName: string, connectionId: string): SchemaNode {
+    return {
+      id: `s:${schemaName}`,
+      kind: 'schemaGroup',
+      label: schemaName,
+      connectionId,
+      schema: schemaName,
+      collapsible: true,
+    };
+  }
+
+  /** Convert an internal TreeItem into the plain object the webview renders. */
+  private toNode(item: SchemaTreeItem, connectionId: string): SchemaNode {
+    const description = typeof item.description === 'string' ? item.description : undefined;
+    const label = typeof item.label === 'string'
+      ? item.label
+      : String(item.label?.label ?? '');
+
+    if (item instanceof SchemaGroupItem) {
+      return this.schemaGroupNode(item.schemaName, item.connectionId);
+    }
+
+    if (item instanceof TableGroupItem) {
+      return {
+        id: `g:${item.groupType}:${item.schema || ''}`,
+        kind: 'tableGroup',
+        label,
+        description,
+        connectionId: item.connectionId,
+        schema: item.schema,
+        groupType: item.groupType,
+        collapsible: item.tables.length > 0,
+      };
+    }
+
+    if (item instanceof TableItem) {
+      const info = item.tableInfo;
+      return {
+        id: `t:${info.schema || ''}:${info.name}`,
+        kind: 'table',
+        label: info.name,
+        description,
+        connectionId: item.connectionId,
+        schema: info.schema,
+        collapsible: true,
+        tableInfo: info,
+      };
+    }
+
+    if (item instanceof RedisKeyItem) {
+      return {
+        id: `k:${item.keyName}`,
+        kind: 'redisKey',
+        label: item.keyName,
+        description,
+        connectionId,
+        collapsible: false,
+        // Key entries open through the same grid path as tables, which expects
+        // the encoded "<type>:<key>" pseudo-table name.
+        tableInfo: {
+          name: encodeRedisKeyTable(item.keyType, item.keyName),
+          type: 'table',
+        },
+        redis: { keyName: item.keyName, keyType: item.keyType, ttl: item.ttl, size: item.size },
+      };
+    }
+
+    if (item instanceof ColumnItem) {
+      const column = item.column;
+      return {
+        id: `c:${column.name}`,
+        kind: 'column',
+        label: column.name,
+        description,
+        connectionId,
+        collapsible: false,
+        column: {
+          dataType: column.type,
+          nullable: column.nullable,
+          isPrimaryKey: !!column.isPrimaryKey,
+          isUnique: !!column.isUnique,
+          isAutoIncrement: !!column.isAutoIncrement,
+          isForeignKey: !!column.foreignKey,
+          maxLength: column.maxLength,
+          defaultValue: column.defaultValue === undefined || column.defaultValue === null
+            ? undefined
+            : String(column.defaultValue),
+          comment: column.comment,
+        },
+      };
+    }
+
+    return {
+      id: `x:${label}`,
+      kind: 'column',
+      label,
+      description,
+      connectionId,
+      collapsible: false,
+    };
   }
 
   async getChildren(element?: SchemaTreeItem): Promise<SchemaTreeItem[]> {
@@ -397,13 +547,14 @@ export class SchemaTreeProvider implements vscode.TreeDataProvider<SchemaTreeIte
 
     const groups: SchemaTreeItem[] = [];
     groups.push(new TableGroupItem(t('Tables'), 'tables', connectionId, regularTables, schema));
+    // Only show the Views group when the database actually has views.
     if (views.length > 0) {
       groups.push(new TableGroupItem(t('Views'), 'views', connectionId, views, schema));
     }
     return groups;
   }
 
-  private async getRedisKeys(group: string, connectionId: string): Promise<SchemaTreeItem[]> {
+  private async getRedisKeys(group: string, connectionId: string): Promise<RedisKeyItem[]> {
     const driver = this.connectionManager.getDriver(connectionId) as RedisDriver | undefined;
     if (!driver || typeof (driver as any).getKeyList !== 'function') { return []; }
     try {

@@ -2,7 +2,7 @@
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
   "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis/ClickHouse/Elasticsearch/MongoDB/SQL Server connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
-  "version": "0.3.3",
+  "version": "0.3.5",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
@@ -165,6 +165,7 @@
           "name": "%Saved SQL%"
         },
         {
+          "type": "webview",
           "id": "sqlens.schema",
           "name": "%Schema%"
         }
@@ -389,6 +390,18 @@
         "title": "%Refresh Schema%",
         "category": "%Sqlens%",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "sqlens.filterSchema",
+        "title": "%Filter Tables & Views%",
+        "category": "%Sqlens%",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "sqlens.clearSchemaFilter",
+        "title": "%Clear Table Filter%",
+        "category": "%Sqlens%",
+        "icon": "$(close)"
       },
       {
         "command": "sqlens.runStatementAt",
@@ -642,14 +655,19 @@
           "group": "navigation"
         },
         {
-          "command": "sqlens.refreshSchema",
+          "command": "sqlens.filterSchema",
           "when": "view == sqlens.schema",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "command": "sqlens.createTable",
           "when": "view == sqlens.schema && sqlens.hasActiveConnection && sqlens.activeDriverRelational",
-          "group": "navigation"
+          "group": "navigation@2"
+        },
+        {
+          "command": "sqlens.refreshSchema",
+          "when": "view == sqlens.schema",
+          "group": "navigation@3"
         },
         {
           "command": "sqlens.mcp.openPanel.running",
@@ -853,56 +871,6 @@
           "command": "sqlens.erDiagram",
           "when": "view == sqlens.connections && viewItem =~ /^database/ && viewItem !~ /(redis|clickhouse|elasticsearch|mongodb)/",
           "group": "2_query@1"
-        },
-        {
-          "command": "sqlens.openTable",
-          "when": "view == sqlens.schema && viewItem =~ /^(table|view)$/",
-          "group": "inline"
-        },
-        {
-          "command": "sqlens.openStructure",
-          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
-          "group": "1_view@1"
-        },
-        {
-          "command": "sqlens.showDDL",
-          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
-          "group": "1_view@2"
-        },
-        {
-          "command": "sqlens.copyCreateTable",
-          "when": "view == sqlens.schema && viewItem == table",
-          "group": "1_view@3"
-        },
-        {
-          "command": "sqlens.generateTestData",
-          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
-          "group": "1_view@4"
-        },
-        {
-          "command": "sqlens.renameTable",
-          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
-          "group": "2_actions@3"
-        },
-        {
-          "command": "sqlens.exportData",
-          "when": "view == sqlens.schema && viewItem == table",
-          "group": "2_actions@1"
-        },
-        {
-          "command": "sqlens.importData",
-          "when": "view == sqlens.schema && viewItem == table",
-          "group": "2_actions@2"
-        },
-        {
-          "command": "sqlens.truncateTable",
-          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
-          "group": "3_danger@1"
-        },
-        {
-          "command": "sqlens.dropTable",
-          "when": "view == sqlens.schema && viewItem == table && sqlens.activeDriverRelational",
-          "group": "3_danger@2"
         }
       ],
       "editor/title": [
@@ -1040,7 +1008,22 @@
             "deny"
           ],
           "default": "confirm",
-          "description": "%How AI write statements are handled: ask for confirmation, allow directly, or deny%"
+          "description": "%How AI write statements are handled: \"confirm\" asks you first, \"allow\" runs them (and CREATE/ALTER) without asking, \"deny\" blocks them. DROP/TRUNCATE and destructive admin commands are always refused.%"
+        },
+        "sqlens.mcp.autoConfirmTimeout": {
+          "type": "number",
+          "default": 120,
+          "description": "%Seconds to wait for a write confirmation before it is denied automatically%"
+        },
+        "sqlens.mcp.focusOnConfirm": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Bring the AI Activity panel into focus when a write needs your confirmation%"
+        },
+        "sqlens.mcp.confirmNotification": {
+          "type": "boolean",
+          "default": true,
+          "description": "%Also show a notification with Allow/Deny buttons when a write needs your confirmation%"
         },
         "sqlens.mcp.maxRows": {
           "type": "number",
@@ -1239,7 +1222,7 @@
     "compile:tests": "tsc -p tsconfig.json",
     "test": "npm run compile:tests && node ./dist/test/runTest.js",
     "package": "vsce package",
-    "final": "vsce package -o sqlens-vscode.vsix",
+    "final": "vsce package -o sqlens-vscode-${npm_package_version}.vsix",
     "publish": "vsce publish"
   },
   "dependencies": {

@@ -13,6 +13,8 @@ import { normalizeClickHouseType } from '../src/core/drivers/ClickHouseDriver';
 import { normalizeEsType, parseRequestText } from '../src/core/drivers/ElasticsearchDriver';
 import { normalizeSqlType } from '../src/core/drivers/MSSQLDriver';
 import { parseMongoCall } from '../src/core/drivers/MongoDBDriver';
+import { SecurityGuard } from '../src/core/mcp/SecurityGuard';
+import { matchTableFilter } from '../webview-ui/src/panels/Schema/schemaTableFilter';
 import { NormalizedColumnType } from '../src/core/types';
 
 const ROOT = path.resolve(__dirname, '..');
@@ -195,4 +197,58 @@ test('every t() key used in the webview has a Chinese translation', () => {
     [],
     `Missing Chinese translations for:\n  ${missing.join('\n  ')}`,
   );
+});
+
+// ── Schema filter ───────────────────────────────────────────────────────────
+
+test('schema filter: substring, wildcard and qualified matching', () => {
+  // Empty pattern shows everything.
+  assert.equal(matchTableFilter('users', 'public', ''), true);
+  assert.equal(matchTableFilter('users', 'public', '   '), true);
+
+  // Plain text is a case-insensitive substring match.
+  assert.equal(matchTableFilter('UserEvents', 'public', 'events'), true);
+  assert.equal(matchTableFilter('users', 'public', 'users'), true);
+  assert.equal(matchTableFilter('users', 'public', 'orders'), false);
+
+  // The qualified schema.table form matches too.
+  assert.equal(matchTableFilter('users', 'public', 'public.users'), true);
+  assert.equal(matchTableFilter('users', 'public', 'analytics.users'), false);
+
+  // Wildcards.
+  assert.equal(matchTableFilter('users', 'public', 'user*'), true);
+  assert.equal(matchTableFilter('users', 'public', '*s'), true);
+  assert.equal(matchTableFilter('users', 'public', 'u?ers'), true);
+  assert.equal(matchTableFilter('users', 'public', 'u?ser'), false);
+  assert.equal(matchTableFilter('users', 'public', 'public.*'), true);
+  assert.equal(matchTableFilter('users', 'public', 'audit_*'), false);
+});
+
+// ── MCP write guard ─────────────────────────────────────────────────────────
+
+test('guard: DDL passes only with auto-approve, destructive statements never do', () => {
+  const guard = new SecurityGuard();
+  const write = { readOnly: false, allowWrite: true, driverType: 'mysql' };
+
+  // Write mode without auto-approve: plain writes pass, DDL stays refused.
+  assert.equal(guard.validate('INSERT INTO t VALUES (1)', write).ok, true);
+  assert.equal(guard.validate('CREATE TABLE t (id INT)', write).ok, false);
+  assert.equal(guard.validate('ALTER TABLE t ADD COLUMN n INT', write).ok, false);
+
+  // Auto-approve writes: CREATE/ALTER become allowed...
+  const auto = { ...write, allowDdl: true };
+  assert.equal(guard.validate('INSERT INTO t VALUES (1)', auto).ok, true);
+  assert.equal(guard.validate('CREATE TABLE t (id INT)', auto).ok, true);
+  assert.equal(guard.validate('ALTER TABLE t ADD COLUMN n INT', auto).ok, true);
+  assert.equal(guard.validate('CREATE INDEX i ON t (id)', auto).ok, true);
+
+  // ...but destructive and unbounded statements are still refused.
+  assert.equal(guard.validate('DROP TABLE t', auto).ok, false);
+  assert.equal(guard.validate('TRUNCATE TABLE t', auto).ok, false);
+  assert.equal(guard.validate('DELETE FROM t', auto).ok, false);
+  assert.equal(guard.validate('UPDATE t SET a = 1', auto).ok, false);
+  assert.equal(guard.validate('ALTER TABLE t ADD n INT', { ...auto, readOnly: true, allowWrite: false }).ok, false);
+
+  // Multiple statements stay refused for the SQL family.
+  assert.equal(guard.validate('SELECT 1; SELECT 2', auto).ok, false);
 });

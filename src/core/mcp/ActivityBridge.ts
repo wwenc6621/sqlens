@@ -177,7 +177,7 @@ export class ActivityBridge {
    * (inline card). Resolves true if allowed, false on deny/timeout.
    */
   async requestWriteConfirmation(sql: string, client: string, connectionName?: string): Promise<boolean> {
-    const timeoutMs = vscode.workspace.getConfiguration('sqlens.mcp').get<number>('autoConfirmTimeout', 30) * 1000;
+    const timeoutMs = vscode.workspace.getConfiguration('sqlens.mcp').get<number>('autoConfirmTimeout', 120) * 1000;
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const request: PendingWrite = { id, timestamp: Date.now(), client, tool: 'write_query', sql, connectionName, timeoutMs };
 

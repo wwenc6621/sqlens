@@ -6,6 +6,7 @@ import ERDiagram from './panels/ERDiagram/ERDiagram';
 import QueryPlanView from './panels/QueryPlan/QueryPlanView';
 import QuickView from './panels/QuickView/QuickView';
 import CreateTable from './panels/CreateTable/CreateTable';
+import SchemaPanel from './panels/Schema/SchemaPanel';
 
 declare global {
   interface Window {
@@ -31,6 +32,8 @@ export default function App() {
       return <QueryPlanView />;
     case 'quickView':
       return <QuickView />;
+    case 'schema':
+      return <SchemaPanel />;
     default:
       return <div style={{ padding: 20, color: 'var(--vscode-foreground)' }}>Unknown panel: {panelType}</div>;
   }

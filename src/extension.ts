@@ -9,6 +9,7 @@ import { ConnectionStorage } from './core/connection/ConnectionStorage';
 import { ConnectionTransfer } from './core/connection/ConnectionTransfer';
 import { ConnectionTreeProvider, ConnectionDragAndDropController } from './views/sidebar/ConnectionTreeProvider';
 import { SchemaTreeProvider } from './views/sidebar/SchemaTreeProvider';
+import { SchemaWebviewViewProvider } from './views/schema/SchemaWebviewViewProvider';
 import { SavedQueryTreeProvider } from './views/sidebar/SavedQueryTreeProvider';
 import { Logger, LogEntry } from './core/utils/Logger';
 import { WebviewManager } from './views/webview/WebviewManager';
@@ -48,7 +49,7 @@ let webviewManager: WebviewManager;
 let connectionTreeProvider: ConnectionTreeProvider;
 let savedQueryTreeProvider: SavedQueryTreeProvider;
 let schemaTreeProvider: SchemaTreeProvider;
-let schemaTreeView: vscode.TreeView<any>;
+let schemaWebviewViewProvider: SchemaWebviewViewProvider;
 let schemaProvider: SchemaProvider;
 let queryEngine: QueryEngine;
 let queryHistory: QueryHistory;
@@ -583,11 +584,26 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  schemaTreeView = vscode.window.createTreeView('sqlens.schema', {
-      treeDataProvider: schemaTreeProvider,
-      showCollapseAll: true,
-    });
-  context.subscriptions.push(schemaTreeView);
+  // The Schema sidebar is a webview: an inline filter box and in-place rename
+  // are impossible in a native TreeView. `schemaTreeProvider` still owns the
+  // data and the caches; the webview only renders it.
+  schemaWebviewViewProvider = new SchemaWebviewViewProvider(context, connectionManager, schemaTreeProvider);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      SchemaWebviewViewProvider.viewType,
+      schemaWebviewViewProvider,
+      { webviewOptions: { retainContextWhenHidden: true } },
+    ),
+  );
+
+  // ── Schema filter ──
+  // Filtering itself happens in the webview (instant, no round-trip); these
+  // commands only drive its input box, so the keyboard/menu entry points keep
+  // working.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.filterSchema', () => schemaWebviewViewProvider.focusFilter()),
+    vscode.commands.registerCommand('sqlens.clearSchemaFilter', () => schemaWebviewViewProvider.clearFilter()),
+  );
 
   // ── Language Features (Phase 2) ──
 
@@ -621,13 +637,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   mcpActivity = new ActivityBridge(context);
   mcpService = new McpService(connectionManager, queryHistory, mcpActivity, (table) => {
-    // Action follow: briefly select the table the AI touched in the Schema tree.
-    const connId = connectionManager.activeConnectionId;
-    if (!connId) { return; }
-    void schemaTreeProvider
-      .findTableItem(table, connId)
-      .then(item => item ? schemaTreeView.reveal(item, { select: true, focus: false }) : undefined)
-      .catch(() => {});
+    // Action follow: briefly highlight the table the AI touched in the Schema view.
+    if (!connectionManager.activeConnectionId) { return; }
+    void schemaWebviewViewProvider?.revealTable(table).catch(() => {});
   });
   mcpRegistrar = new AssistantRegistrar(
     () => mcpService?.endpoint || '',
@@ -755,6 +767,15 @@ export function activate(context: vscode.ExtensionContext) {
             postMcpStatus(false);
             return;
           }
+          case 'mcpToggleAutoApprove': {
+            // Auto-approve writes is `writeMode: 'allow'` — the AI executes
+            // INSERT/UPDATE/DELETE/CREATE/ALTER without asking. DROP/TRUNCATE
+            // and destructive admin commands stay blocked.
+            const next = msg.data?.autoApprove ? 'allow' : 'confirm';
+            await vscode.workspace.getConfiguration('sqlens.mcp').update('writeMode', next, vscode.ConfigurationTarget.Global);
+            postMcpStatus(false);
+            return;
+          }
           case 'mcpOpenActivity':
             postAiActivityData(true);
             return;
@@ -763,29 +784,84 @@ export function activate(context: vscode.ExtensionContext) {
     }
   }
 
-  // Live-update the tab whenever activity changes; auto-open on first AI call.
-  context.subscriptions.push(mcpActivity.onDidChange(() => {
-    const hasTab = panelTabHandlers.has(AI_ACTIVITY_TAB_ID);
-    if (!hasTab) {
-      const entries = mcpActivity!.getEntries();
-      const pending = mcpActivity!.getPendingWrites();
-      const autoOpen = vscode.workspace.getConfiguration('sqlens.mcp').get<boolean>('autoOpenActivity', true);
-      if ((entries.length > 0 || pending.length > 0) && autoOpen) {
-        // First AI activity in this window: open the panel so the user sees it.
-        postAiActivityData(true);
-      }
-      return;
-    }
+  /** Push the activity snapshot without touching focus or the active tab. */
+  function pushAiActivitySilently() {
+    if (!mcpActivity) { return; }
     queryResultsViewProvider.postSilently({
       type: 'aiActivityData',
       instanceId: AI_ACTIVITY_TAB_ID,
       tabKind: 'aiActivity',
       tabTitle: t('AI Activity'),
       data: {
-        entries: mcpActivity!.getEntries(),
-        pending: mcpActivity!.getPendingWrites(),
+        entries: mcpActivity.getEntries(),
+        pending: mcpActivity.getPendingWrites(),
       },
     } as any);
+  }
+
+  /**
+   * Non-modal toast for a write waiting on the user, with direct actions. The
+   * in-panel card is the primary UI, but a notification also reaches the user
+   * when the Sqlens panel is hidden behind another editor group or the window
+   * is not focused at all.
+   */
+  async function promptWriteConfirmation(request: { id: string; sql: string; connectionName?: string }) {
+    const flat = request.sql.replace(/\s+/g, ' ').trim();
+    const preview = flat.length > 140 ? `${flat.slice(0, 140)}…` : flat;
+    const where = request.connectionName ? t(' on {0}', request.connectionName) : '';
+    const allow = t('Allow');
+    const deny = t('Deny');
+    const choice = await vscode.window.showWarningMessage(
+      t('AI wants to run a write statement{0}: {1}', where, preview),
+      { modal: false },
+      allow,
+      deny,
+    );
+    if (choice === allow) { mcpActivity?.resolvePending(request.id, true); }
+    else if (choice === deny) { mcpActivity?.resolvePending(request.id, false); }
+  }
+
+  // Live-update the tab whenever activity changes; auto-open on first AI call.
+  // A pending write forces the panel into view — a confirmation card the user
+  // never notices is indistinguishable from a denial (it times out).
+  const seenPendingWrites = new Set<string>();
+  context.subscriptions.push(mcpActivity.onDidChange(() => {
+    const entries = mcpActivity!.getEntries();
+    const pending = mcpActivity!.getPendingWrites();
+    const cfg = vscode.workspace.getConfiguration('sqlens.mcp');
+    const hasTab = panelTabHandlers.has(AI_ACTIVITY_TAB_ID);
+
+    // Forget resolved ids so a future request is treated as fresh again.
+    for (const id of [...seenPendingWrites]) {
+      if (!pending.some(p => p.id === id)) { seenPendingWrites.delete(id); }
+    }
+    const freshPending = pending.filter(p => !seenPendingWrites.has(p.id));
+    for (const p of pending) { seenPendingWrites.add(p.id); }
+
+    if (freshPending.length === 0) {
+      if (!hasTab) {
+        const autoOpen = cfg.get<boolean>('autoOpenActivity', true);
+        if ((entries.length > 0 || pending.length > 0) && autoOpen) {
+          // First AI activity in this window: open the panel so the user sees it.
+          postAiActivityData(true);
+        }
+        return;
+      }
+      pushAiActivitySilently();
+      return;
+    }
+
+    const focusOnConfirm = cfg.get<boolean>('focusOnConfirm', true);
+    if (focusOnConfirm) {
+      // Focusing the container makes the webview visible; `activate` then
+      // switches it to the AI Activity tab.
+      void vscode.commands.executeCommand('sqlens.queryResultsView.focus');
+    }
+    postAiActivityData(focusOnConfirm || !hasTab);
+
+    if (cfg.get<boolean>('confirmNotification', true)) {
+      for (const request of freshPending) { void promptWriteConfirmation(request); }
+    }
   }));
 
   const mcpEnabled = vscode.workspace.getConfiguration('sqlens.mcp').get<boolean>('enabled', true);
@@ -3036,31 +3112,43 @@ export function activate(context: vscode.ExtensionContext) {
       const resolved = resolveItemDriver(item);
       if (!resolved) {
         vscode.window.showErrorMessage(t('No table selected.'));
-        return;
+        return { ok: false, error: 'no-table' };
       }
 
       const { driver, tableInfo } = resolved;
       if (tableInfo.type && tableInfo.type !== 'table') {
         vscode.window.showWarningMessage(t('Only tables can be renamed.'));
-        return;
+        return { ok: false, error: 'not-a-table' };
       }
 
       const currentName: string = tableInfo.name;
-      const newName = await vscode.window.showInputBox({
-        title: (t('Rename table "{0}"', currentName)),
-        prompt: 'Enter the new table name',
-        value: currentName,
-        valueSelection: [0, currentName.length],
-        validateInput: (value) => {
-          const name = value.trim();
-          if (!name) { return 'Table name cannot be empty.'; }
-          if (name === currentName) { return 'Enter a different name.'; }
-          if (!/^[\w$]+$/.test(name)) { return 'Use letters, digits, underscore or $ only.'; }
-          return undefined;
-        },
-      });
-      if (newName === undefined) { return; }
+      const validate = (value: string): string | undefined => {
+        const name = value.trim();
+        if (!name) { return t('Table name cannot be empty.'); }
+        if (name === currentName) { return t('Enter a different name.'); }
+        if (!/^[\w$]+$/.test(name)) { return t('Use letters, digits, underscore or $ only.'); }
+        return undefined;
+      };
+
+      // The Schema webview renames in place and passes the value straight in;
+      // every other entry point (command palette, keybinding) still gets a
+      // prompt.
+      const provided = typeof item?.newName === 'string' ? item.newName : undefined;
+      let newName: string | undefined = provided;
+      if (newName === undefined) {
+        newName = await vscode.window.showInputBox({
+          title: (t('Rename table "{0}"', currentName)),
+          prompt: 'Enter the new table name',
+          value: currentName,
+          valueSelection: [0, currentName.length],
+          validateInput: validate,
+        });
+      }
+      if (newName === undefined) { return { ok: false, error: 'cancelled' }; }
+
       const target = newName.trim();
+      const invalid = validate(target);
+      if (invalid) { return { ok: false, error: invalid }; }
 
       const schemaName: string | undefined = tableInfo.schema;
       const qualified = schemaName
@@ -3081,8 +3169,11 @@ export function activate(context: vscode.ExtensionContext) {
         schemaTreeProvider.clearCache();
         schemaTreeProvider.refresh();
         schemaProvider.refresh();
+        return { ok: true, name: target };
       } catch (err) {
-        vscode.window.showErrorMessage(t('Failed to rename table: {0}', err instanceof Error ? err.message : String(err)));
+        const message = err instanceof Error ? err.message : String(err);
+        vscode.window.showErrorMessage(t('Failed to rename table: {0}', message));
+        return { ok: false, error: message };
       }
     }),
   );
@@ -3464,28 +3555,11 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('sqlens.refreshSchema', async () => {
-      const selectedTable = schemaTreeView.selection
-        .map((item: any) => item?.tableInfo ? {
-          name: item.tableInfo.name as string,
-          schema: item.tableInfo.schema as string | undefined,
-          connectionId: item.connectionId as string,
-        } : undefined)
-        .find(Boolean);
+      // The webview keeps its own selection and expand state, so a plain
+      // invalidate is enough — no reveal bookkeeping needed here.
       schemaTreeProvider.clearCache();
       schemaTreeProvider.refresh();
       schemaProvider.refresh();
-      if (selectedTable) {
-        setTimeout(() => {
-          void schemaTreeProvider
-            .findTableItem(selectedTable.name, selectedTable.connectionId, selectedTable.schema)
-            .then(item => {
-              if (item) {
-                return schemaTreeView.reveal(item, { select: true, focus: false });
-              }
-              return undefined;
-            });
-        }, 150);
-      }
     }),
   );
 

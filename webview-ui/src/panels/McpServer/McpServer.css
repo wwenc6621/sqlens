@@ -252,6 +252,26 @@
   font-weight: 600;
 }
 
+/* Auto-approve writes: orange rather than green — it is a trust decision. */
+.mcp-switch.danger input:checked + .mcp-switch-track {
+  background: var(--vscode-charts-orange, #d18616);
+}
+
+.mcp-switch.disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.mcp-switch.disabled input:checked + .mcp-switch-track {
+  background: var(--vscode-input-border, rgba(255, 255, 255, 0.25));
+}
+
+.mcp-banner.danger {
+  color: var(--vscode-notificationsErrorIcon-foreground, #f14c4c);
+  background: color-mix(in srgb, var(--vscode-notificationsErrorIcon-foreground, #f14c4c) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--vscode-notificationsErrorIcon-foreground, #f14c4c) 35%, transparent);
+}
+
 .mcp-mode-meta {
   font-size: 12px;
   color: var(--vscode-descriptionForeground);

@@ -2,6 +2,36 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.3.5 (2026-09-26)
+
+### Added
+
+- **The Schema view is now a webview, with an inline filter and in-place rename.** The filter icon in the view title bar expands a text box right there in the panel (no modal dialog) and the tree narrows as you type, `*` / `?` wildcards included. Right-click → **Rename** turns the table name into an input on its own row; Enter commits, Escape cancels, and invalid names are reported inline instead of in a separate prompt.
+- **Tables and views expand by default** again (the old native tree created its groups with `CollapsibleState.Expanded`). Groups you collapse yourself stay collapsed across refreshes; changing connection resets that.
+- **A proper right-click menu on tables**: Open Table, View Structure, Show DDL, Copy CREATE TABLE, Generate Test Data, Export / Import Data, Rename, Truncate Table, Drop Table — shown only when the active driver supports them, with destructive entries in red.
+
+### Changed
+
+- **The MCP panel's access switch now reads the right way round:** the switch is on for **Read & Write**, off for **Read-only**. It maps to the same `sqlens.mcp.readOnly` setting as before, so existing configuration keeps its meaning.
+- **The Schema view now matches the Connections tree next to it**: same sidebar font family / size / weight and text colour, object names in semibold with muted row counts, types and comments, and the panel background uses the sidebar colour rather than the editor colour (which made the two areas visibly different in most themes).
+
+### Fixed
+
+- **MySQL views were listed under "Tables"** until the background statistics query corrected their type. The fast listing now uses `SHOW FULL TABLES`, which returns the table type at the same cost, so views land in **Views** straight away.
+
+## 0.3.4 (2026-09-26)
+
+### Added
+
+- **Schema tree filter.** A filter button in the Schema view header opens a live filter input: the tree narrows as you type, `*` and `?` wildcards are supported, and the qualified `schema.table` form (e.g. `public.users`) matches too. The active pattern is shown in the view header with a one-click clear button, and a filtered group reports `matched / total` so hidden objects are visible instead of silently missing. Escape restores the previous pattern, and switching connections clears the filter.
+- **"Auto-approve" switch in the MCP Server panel.** It flips `sqlens.mcp.writeMode` between `confirm` and `allow`; with `allow` the AI executes writes without asking.
+
+### Changed
+
+- **Write confirmations can no longer be missed.** When the AI asks to run a write, Sqlens now reveals the query panel and activates the AI Activity tab instead of only updating it when it happens to be on screen — a confirmation card the user never noticed used to end as a timeout-denial. A non-modal notification with **Allow** / **Deny** buttons is shown as well, so the request is actionable from anywhere. Both are configurable via `sqlens.mcp.focusOnConfirm` and `sqlens.mcp.confirmNotification`, and `sqlens.mcp.autoConfirmTimeout` is now declared in Settings with a 120 s default (was an undeclared 30 s).
+- **`writeMode: "allow"` now also permits CREATE/ALTER**, so the auto-approve switch covers the DDL the AI needs. `DROP`, `TRUNCATE` and destructive admin commands are classified as unconditionally refused and stay blocked in every mode, including auto-approve. The `write_query` tool description and the panel banner both state the active mode.
+- The second MCP panel switch is disabled while the server is in read-only mode, since writes cannot run at all then.
+
 ## 0.3.3 (2026-09-26)
 
 ### Improved

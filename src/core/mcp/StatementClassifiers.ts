@@ -34,6 +34,10 @@ const SQL_DDL = /^(create|alter|drop|truncate|rename|grant|revoke|comment|vacuum
 
 /** Statements that are always refused, regardless of mode. */
 const SQL_DANGER: { pattern: RegExp; reason: string }[] = [
+  // Destructive DDL stays refused even when auto-approve writes is enabled:
+  // the point of that mode is INSERT/UPDATE/DELETE/ALTER, not dropping objects.
+  { pattern: /^drop\b/i, reason: 'DROP is refused for AI calls.' },
+  { pattern: /^truncate\b/i, reason: 'TRUNCATE is refused for AI calls.' },
   { pattern: /\binto\s+(outfile|dumpfile)\b/i, reason: 'INTO OUTFILE/DUMPFILE is not allowed' },
   { pattern: /\bload_file\s*\(/i, reason: 'LOAD_FILE is not allowed' },
   { pattern: /\bload_data\b/i, reason: 'LOAD DATA is not allowed' },

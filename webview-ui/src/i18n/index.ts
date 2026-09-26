@@ -22,6 +22,13 @@ function detectLocale(): Locale {
 export const locale: Locale = detectLocale();
 
 const zh: Record<string, string> = {
+  // MCP Server panel
+  'Auto-approve': '自动批准',
+  'Confirm writes': '写操作需确认',
+  'Switch to Read & Write first to enable writes': '先切换到「读写」模式才能开启写操作',
+  'Writes execute without confirmation': '写操作无需确认，直接执行',
+  'Every write asks for confirmation': '每次写操作都需要确认',
+  'Auto-approve is on: AI writes (INSERT/UPDATE/DELETE/CREATE/ALTER) run without confirmation. DROP and TRUNCATE are still blocked.': '自动批准已开启：AI 的写操作（INSERT/UPDATE/DELETE/CREATE/ALTER）将不再询问而直接执行。DROP 与 TRUNCATE 仍被禁止。',
   // DataGrid
   'Preparing data grid': '正在准备数据表格',
   'No Results': '无结果',
@@ -410,6 +417,40 @@ const zh: Record<string, string> = {
   'Copy all as CSV': '全部复制为 CSV',
   'Copy all as TSV': '全部复制为 TSV',
   'Index name': '索引名',
+  // Schema panel (sidebar webview)
+  'Filter Tables & Views': '筛选表与视图',
+  'Filter tables...': '筛选表…',
+  'Loading table list...': '正在加载表列表…',
+  'No active connection': '没有活动连接',
+  'Connect to a database to browse its tables.': '连接一个数据库后即可浏览其中的表。',
+  'No tables': '没有表',
+  'No matches': '没有匹配项',
+  'Collapse all': '全部折叠',
+  'New Table': '新建表',
+  'Open Table': '打开表',
+  'Open Key': '打开键',
+  'View Structure': '查看结构',
+  'Show DDL': '查看 DDL',
+  'Copy CREATE TABLE': '复制 CREATE TABLE',
+  'Generate Test Data': '生成测试数据',
+  'Export Data': '导出数据',
+  'Import Data': '导入数据',
+  'Rename': '重命名',
+  'Rename to...': '重命名为…',
+  'Truncate Table': '清空表',
+  'Drop Table': '删除表',
+  'Table name cannot be empty.': '表名不能为空。',
+  'Enter a different name.': '请输入一个不同的名称。',
+  'Use letters, digits, underscore or $ only.': '只能使用字母、数字、下划线或 $。',
+  '{0} of {1}': '{0} / {1}',
+  // Schema panel — hover tooltip
+  'Size': '大小',
+  'Foreign Key': '外键',
+  'YES': '是',
+  'NO': '否',
+  'TTL': 'TTL',
+  'Double-click to open the table': '双击打开数据表',
+  'Double-click to open entries': '双击打开内容',
 
 };
 

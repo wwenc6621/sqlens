@@ -14,7 +14,7 @@ interface ActiveConnection {
 }
 
 /** Drivers with a relational model (ER diagram, structure editing, SQL dump). */
-const RELATIONAL_DRIVERS: string[] = [
+export const RELATIONAL_DRIVERS: string[] = [
   DatabaseType.MySQL, DatabaseType.MariaDB, DatabaseType.PostgreSQL,
   DatabaseType.SQLite, DatabaseType.MSSQL,
 ];

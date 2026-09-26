@@ -43,9 +43,12 @@ export class SecurityGuard {
    * Validate a statement before execution.
    * @param readOnly when true, only read statements pass.
    * @param allowWrite when true (write mode), INSERT/UPDATE/DELETE pass but DDL does not.
+   * @param allowDdl when true (auto-approve writes), CREATE/ALTER also pass.
+   *   Statements classified as `danger` (DROP, TRUNCATE, server file/admin
+   *   access) are refused no matter what.
    * @param driverType driver-aware classification (SQL / redis / es / mongo / ...).
    */
-  validate(text: string, opts: { readOnly: boolean; allowWrite: boolean; driverType?: string }): GuardResult {
+  validate(text: string, opts: { readOnly: boolean; allowWrite: boolean; allowDdl?: boolean; driverType?: string }): GuardResult {
     const classifier = getClassifier(opts.driverType);
     const statements = classifier.split(text);
 
@@ -75,14 +78,14 @@ export class SecurityGuard {
       return { ok: true, statements };
     }
 
-    // DDL is never allowed through AI tools, even in write mode.
+    // DDL is refused unless auto-approve writes is on.
     const ddl = classified.find(c => c.category === 'ddl');
-    if (ddl) {
+    if (ddl && !opts.allowDdl) {
       return { ok: false, reason: ddl.reason ?? 'DDL statements (CREATE/ALTER/DROP/TRUNCATE...) are not allowed via AI tools. Use the Sqlens UI instead.' };
     }
 
     const hasWrite = classified.some(c => c.category === 'write');
-    if (!hasWrite) {
+    if (!hasWrite && !(ddl && opts.allowDdl)) {
       return { ok: false, reason: 'Statement is not allowed.' };
     }
     if (!opts.allowWrite) {

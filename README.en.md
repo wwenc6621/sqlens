@@ -16,6 +16,7 @@ It works in VS Code and VS Code forks such as Trae, and the UI follows your edit
 - Export/import connection configurations as JSON (passwords excluded by default; plaintext requires a confirmation) for moving between machines.
 - Double-click a disconnected connection in the sidebar to connect (a single click only selects).
 - Browse schemas, tables, views, columns, indexes, and foreign keys.
+- Schema panel: inline filter (`*` / `?` wildcards), in-place table rename, full hover details, and a driver-aware context menu.
 - Open table data in an editable data grid (sort, filter, paginate, inline edit).
 - Run SQL from `.sql` files with CodeLens actions and per-file connection context.
 - Copy rows or pages as CSV, TSV, JSON, XML, SQL `INSERT` / `UPDATE`.
@@ -130,7 +131,7 @@ Pick one or more assistants in the QuickPick — already-registered ones are che
 
 ![Pick assistants](docs/screenshots/mcp2.png)
 
-The **MCP Server panel** in the sidebar shows the running status, endpoint and token, access mode (read-only / read-write), registered assistants at a glance, and can copy the full MCP config JSON in one click:
+The **MCP Server panel** in the sidebar shows the running status, endpoint and token, and controls access through two switches: **Read & Write** (on = writes allowed, i.e. `sqlens.mcp.readOnly` off; off = read-only, the default) and **Auto-approve** (on = writes run without asking, i.e. `writeMode: allow`; unavailable in read-only mode). It also lists the registered assistants and can copy the full MCP config JSON in one click:
 
 ![MCP Server panel](docs/screenshots/mcp3.png)
 
@@ -162,6 +163,8 @@ Restart the assistant's chat window after registering. You can also copy the con
 - The server listens on `127.0.0.1` only and requires a per-install token (`sqlens.mcp.*`).
 - `readOnly` mode blocks write statements from AI assistants.
 - In `confirm` write mode, every write request pops a confirmation dialog, and all AI calls are recorded in the **AI Activity** panel (`sqlens.mcp.showActivity`).
+- When a confirmation is needed, Sqlens reveals the **AI Activity** panel and raises an actionable **Allow** / **Deny** notification, so a request cannot be silently denied by a timeout (`sqlens.mcp.focusOnConfirm`, `sqlens.mcp.confirmNotification`, `sqlens.mcp.autoConfirmTimeout`).
+- With `writeMode: allow`, `INSERT` / `UPDATE` / `DELETE` / `CREATE` / `ALTER` run straight away; `DROP`, `TRUNCATE` and destructive admin commands stay blocked in every mode.
 
 ## Connections Across IDEs
 
@@ -184,6 +187,17 @@ Open or create a `.sql` file, then use:
 - **Change Query Database Context** to pick the target connection/database.
 - **New Query** to create a new SQL document on the active connection.
 - **Format SQL**, **Query History**, **Explain Query Plan** from the editor menu.
+
+## Schema Panel
+
+The **Schema** view in the Sqlens sidebar lists the tables and views of the active connection (and only those two object kinds — no functions, procedures, triggers or sequences):
+
+- **Expanded by default**: the table and view groups open as soon as you connect. Groups you collapse yourself stay collapsed across refreshes, and switching connection restores the default.
+- **Inline filter**: the filter icon in the view title bar expands a text box in place (no modal dialog). The tree narrows as you type, `*` / `?` wildcards and the qualified `schema.table` form both work, and the match count is shown as `matched / total`. `Esc` (or clicking the icon again) closes it.
+- **In-place rename**: right-click a table → **Rename** turns the table name into an input on its own row. Enter commits, `Esc` cancels, and an invalid name is reported right there.
+- **Hover details**: resting on a row shows a table's type / rows / size / engine / comment, or a column's type / nullability / default / length / key / comment.
+- **Context menu**: Open Table, View Structure, Show DDL, Copy CREATE TABLE, Generate Test Data, Export / Import Data, Rename, Truncate Table, Drop Table — only the actions the active driver supports, with destructive entries in red. It closes on Escape or when you click away.
+- The view title bar carries the **filter / new table / refresh** actions.
 
 ## Schema Editing
 

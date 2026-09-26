@@ -655,12 +655,16 @@ export class McpService {
     mcp.tool(
       'write_query',
       'Execute a single write statement. Accepted per connection type: '
-      + 'SQL (mysql/mariadb/postgresql/sqlite/mssql) INSERT/UPDATE/DELETE with a WHERE clause; '
+      + 'SQL (mysql/mariadb/postgresql/sqlite/mssql) INSERT/UPDATE/DELETE with a WHERE clause'
+      + (writeMode === 'allow' ? ', plus CREATE/ALTER' : '') + '; '
       + 'clickhouse INSERT, or a bounded mutation `ALTER TABLE t UPDATE|DELETE ... WHERE ...` (asynchronous); '
       + 'redis one write command (SET/HSET/LPUSH/EXPIRE/DEL/...); '
       + 'elasticsearch PUT/POST to _doc/_update/_bulk/_index; '
       + 'mongodb insertOne/insertMany/updateOne/updateMany/replaceOne/deleteOne/deleteMany. '
-      + 'DDL/DROP/TRUNCATE and destructive admin commands are never allowed. May require user confirmation.',
+      + 'DROP/TRUNCATE and destructive admin commands are never allowed. '
+      + (writeMode === 'allow'
+        ? 'Writes are auto-approved: no user confirmation is requested.'
+        : 'Each write may require user confirmation.'),
       {
         connectionId: z.string().optional().describe('Connection id from list_connections.'),
         sql: z.string().describe('A single write statement in the connection type\'s input syntax.'),
@@ -677,7 +681,15 @@ export class McpService {
 
         const guardConn = await this.getDriver(args.connectionId);
         const driverType = guardConn.driver.driverType;
-        const guard = this.guard.validate(args.sql, { readOnly: false, allowWrite: true, driverType });
+        // `writeMode: 'allow'` is the "auto-approve" switch: writes run without
+        // confirmation and CREATE/ALTER are permitted too. DROP/TRUNCATE stay
+        // blocked by the classifier.
+        const guard = this.guard.validate(args.sql, {
+          readOnly: false,
+          allowWrite: true,
+          allowDdl: writeMode === 'allow',
+          driverType,
+        });
         if (!guard.ok) {
           activity.recordBlocked('write_query', clientName, JSON.stringify(args), guard.reason!);
           return textResult({ ok: false, error: guard.reason }, true);

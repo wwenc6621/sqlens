@@ -230,18 +230,26 @@ export class MySQLDriver extends BaseDriver {
   }
 
   /**
-   * Fast, stats-free table listing (`SHOW TABLES`). On MySQL-compatible
+   * Fast, stats-free table listing (`SHOW FULL TABLES`). On MySQL-compatible
    * distributed databases (e.g. OceanBase) information_schema.TABLES can take
    * many seconds because it aggregates internal statistics; this query returns
    * in milliseconds so UIs can render the list immediately and hydrate the
    * stats afterwards via getTables().
+   *
+   * `FULL` is what makes views discoverable up front: it adds a
+   * `Tables_in_<db>` / `Table_type` pair (BASE TABLE | VIEW), so a view lands in
+   * its own group instead of sitting under "Tables" until the stats query
+   * corrects its type.
    */
   async getTableNames(schema?: string): Promise<{ name: string; type: 'table' | 'view' }[]> {
     this.ensureConnected();
     const db = schema || this.currentDb;
     if (!db) { return []; }
-    const result = await this.query(`SHOW TABLES FROM ${this.escapeIdentifier(db)}`);
-    return result.rows.map(row => ({ name: row[0] as string, type: 'table' as const }));
+    const result = await this.query(`SHOW FULL TABLES FROM ${this.escapeIdentifier(db)}`);
+    return result.rows.map(row => ({
+      name: row[0] as string,
+      type: String(row[1] ?? '').toUpperCase() === 'VIEW' ? 'view' as const : 'table' as const,
+    }));
   }
 
   async getTables(schema?: string): Promise<TableInfo[]> {
