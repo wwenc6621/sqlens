@@ -17,6 +17,7 @@ const ALLOWED_COMMANDS = new Set([
   'sqlens.copyCreateTable',
   'sqlens.generateTestData',
   'sqlens.renameTable',
+  'sqlens.copyTable',
   'sqlens.exportData',
   'sqlens.importData',
   'sqlens.truncateTable',

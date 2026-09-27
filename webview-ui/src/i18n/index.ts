@@ -23,7 +23,7 @@ export const locale: Locale = detectLocale();
 
 const zh: Record<string, string> = {
   // MCP Server panel
-  'Auto-approve': '自动批准',
+  'Auto Approve': '自动批准',
   'Confirm writes': '写操作需确认',
   'Switch to Read & Write first to enable writes': '先切换到「读写」模式才能开启写操作',
   'Writes execute without confirmation': '写操作无需确认，直接执行',
@@ -315,7 +315,7 @@ const zh: Record<string, string> = {
   'Regenerate': '重新生成',
   'Shown only in this panel. Regenerating invalidates previously registered assistants.': '仅在当前面板显示。重新生成会使之前注册的 AI 助手失效。',
   'Access Mode': '访问模式',
-  'Read-only': '只读',
+  'Read Only': '只读',
   'Read & Write': '可读写',
   'AI can only run read queries': 'AI 只能执行只读查询',
   'Write mode': '写入模式',

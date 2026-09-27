@@ -97,6 +97,12 @@ export default function PanelHost() {
     }
   }, []);
 
+  // Let the extension host know which tab is on screen (null = none), so
+  // commands like the MCP title-bar button can toggle instead of re-open.
+  useEffect(() => {
+    postMessage({ type: 'panelActiveTabChanged', instanceId: activeId });
+  }, [activeId]);
+
   useEffect(() => {
     postMessage({ type: 'ready' });
 

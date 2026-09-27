@@ -250,6 +250,8 @@
 .mcp-switch-label {
   font-size: 13px;
   font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 /* Auto-approve writes: orange rather than green — it is a trust decision. */

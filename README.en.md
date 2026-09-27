@@ -16,7 +16,7 @@ It works in VS Code and VS Code forks such as Trae, and the UI follows your edit
 - Export/import connection configurations as JSON (passwords excluded by default; plaintext requires a confirmation) for moving between machines.
 - Double-click a disconnected connection in the sidebar to connect (a single click only selects).
 - Browse schemas, tables, views, columns, indexes, and foreign keys.
-- Schema panel: inline filter (`*` / `?` wildcards), in-place table rename, full hover details, and a driver-aware context menu.
+- Schema panel: inline filter (`*` / `?` wildcards), in-place table rename, one-click table copy (structure + data), full hover details, and a driver-aware context menu.
 - Open table data in an editable data grid (sort, filter, paginate, inline edit).
 - Run SQL from `.sql` files with CodeLens actions and per-file connection context.
 - Copy rows or pages as CSV, TSV, JSON, XML, SQL `INSERT` / `UPDATE`.
@@ -131,7 +131,7 @@ Pick one or more assistants in the QuickPick — already-registered ones are che
 
 ![Pick assistants](docs/screenshots/mcp2.png)
 
-The **MCP Server panel** in the sidebar shows the running status, endpoint and token, and controls access through two switches: **Read & Write** (on = writes allowed, i.e. `sqlens.mcp.readOnly` off; off = read-only, the default) and **Auto-approve** (on = writes run without asking, i.e. `writeMode: allow`; unavailable in read-only mode). It also lists the registered assistants and can copy the full MCP config JSON in one click:
+The **MCP** button in the sidebar title bar opens the MCP Server panel; clicking it again closes the panel. It shows the running status, endpoint and token, and controls access through two switches: **Read & Write** (on = writes allowed, i.e. `sqlens.mcp.readOnly` off; off = read-only, the default) and **Auto Approve** (on = writes run without asking, i.e. `writeMode: allow`; unavailable in read-only mode — hover the switch for details). It also lists the registered assistants and can copy the full MCP config JSON in one click:
 
 ![MCP Server panel](docs/screenshots/mcp3.png)
 
@@ -162,8 +162,8 @@ Restart the assistant's chat window after registering. You can also copy the con
 
 - The server listens on `127.0.0.1` only and requires a per-install token (`sqlens.mcp.*`).
 - `readOnly` mode blocks write statements from AI assistants.
-- In `confirm` write mode, every write request pops a confirmation dialog, and all AI calls are recorded in the **AI Activity** panel (`sqlens.mcp.showActivity`).
-- When a confirmation is needed, Sqlens reveals the **AI Activity** panel and raises an actionable **Allow** / **Deny** notification, so a request cannot be silently denied by a timeout (`sqlens.mcp.focusOnConfirm`, `sqlens.mcp.confirmNotification`, `sqlens.mcp.autoConfirmTimeout`).
+- In `confirm` write mode, every write request shows a confirmation card in the **AI Activity** panel, where all AI calls are recorded (`sqlens.mcp.showActivity`).
+- When a confirmation is needed, Sqlens reveals the **AI Activity** panel and shows the confirmation card there, so a request cannot be silently denied by a timeout (`sqlens.mcp.focusOnConfirm`, `sqlens.mcp.autoConfirmTimeout`).
 - With `writeMode: allow`, `INSERT` / `UPDATE` / `DELETE` / `CREATE` / `ALTER` run straight away; `DROP`, `TRUNCATE` and destructive admin commands stay blocked in every mode.
 
 ## Connections Across IDEs

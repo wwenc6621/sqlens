@@ -36,6 +36,7 @@
   "Edit Table Structure": "Edit Table Structure",
   "Show DDL": "Show DDL",
   "Copy CREATE TABLE to Clipboard": "Copy CREATE TABLE to Clipboard",
+  "Copy Table": "Copy Table",
   "Rename Table": "Rename Table",
   "Switch Database": "Switch Database",
   "Refresh": "Refresh",

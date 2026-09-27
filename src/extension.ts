@@ -403,6 +403,13 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
+    // Track which panel tab is currently on screen (null/undefined = none),
+    // used by the MCP title-bar button to toggle the MCP panel.
+    if ((message as any).type === 'panelActiveTabChanged') {
+      mcpTabActive = instanceId === MCP_TAB_ID;
+      return;
+    }
+
     // Route tab messages to the handler that owns that tab instance.
     if (instanceId) {
       const handler = panelTabHandlers.get(instanceId);
@@ -716,6 +723,23 @@ export function activate(context: vscode.ExtensionContext) {
     };
   }
 
+  /** Whether the MCP Server tab is the active panel tab right now. */
+  let mcpTabActive = false;
+
+  /** Open the MCP panel, or close its tab if it is already on screen. */
+  function toggleMcpPanel() {
+    if (mcpTabActive) {
+      // Same cleanup as a webview-initiated close.
+      queryResultsViewProvider.postSilently({ type: 'closePanelTab', instanceId: MCP_TAB_ID } as any);
+      panelTabHandlers.delete(MCP_TAB_ID);
+      panelTabConnections.delete(MCP_TAB_ID);
+      queryResultsViewProvider.removeTab(MCP_TAB_ID);
+      mcpTabActive = false;
+      return;
+    }
+    postMcpStatus(true);
+  }
+
   /** Push current MCP status into the MCP panel tab (creating it on first use). */
   function postMcpStatus(activate: boolean) {
     if (!mcpService) { return; }
@@ -799,27 +823,6 @@ export function activate(context: vscode.ExtensionContext) {
     } as any);
   }
 
-  /**
-   * Non-modal toast for a write waiting on the user, with direct actions. The
-   * in-panel card is the primary UI, but a notification also reaches the user
-   * when the Sqlens panel is hidden behind another editor group or the window
-   * is not focused at all.
-   */
-  async function promptWriteConfirmation(request: { id: string; sql: string; connectionName?: string }) {
-    const flat = request.sql.replace(/\s+/g, ' ').trim();
-    const preview = flat.length > 140 ? `${flat.slice(0, 140)}…` : flat;
-    const where = request.connectionName ? t(' on {0}', request.connectionName) : '';
-    const allow = t('Allow');
-    const deny = t('Deny');
-    const choice = await vscode.window.showWarningMessage(
-      t('AI wants to run a write statement{0}: {1}', where, preview),
-      { modal: false },
-      allow,
-      deny,
-    );
-    if (choice === allow) { mcpActivity?.resolvePending(request.id, true); }
-    else if (choice === deny) { mcpActivity?.resolvePending(request.id, false); }
-  }
 
   // Live-update the tab whenever activity changes; auto-open on first AI call.
   // A pending write forces the panel into view — a confirmation card the user
@@ -858,10 +861,6 @@ export function activate(context: vscode.ExtensionContext) {
       void vscode.commands.executeCommand('sqlens.queryResultsView.focus');
     }
     postAiActivityData(focusOnConfirm || !hasTab);
-
-    if (cfg.get<boolean>('confirmNotification', true)) {
-      for (const request of freshPending) { void promptWriteConfirmation(request); }
-    }
   }));
 
   const mcpEnabled = vscode.workspace.getConfiguration('sqlens.mcp').get<boolean>('enabled', true);
@@ -898,10 +897,10 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage(t('Copied: {0}', mcpServer.endpoint));
     }),
     vscode.commands.registerCommand('sqlens.mcp.showActivity', () => postAiActivityData(true)),
-    vscode.commands.registerCommand('sqlens.mcp.openPanel', () => postMcpStatus(true)),
+    vscode.commands.registerCommand('sqlens.mcp.openPanel', () => toggleMcpPanel()),
     // Same handler as openPanel; exists only so the title-bar icon can turn
     // green while the MCP server is running (menu `when` picks the variant).
-    vscode.commands.registerCommand('sqlens.mcp.openPanel.running', () => postMcpStatus(true)),
+    vscode.commands.registerCommand('sqlens.mcp.openPanel.running', () => toggleMcpPanel()),
     vscode.commands.registerCommand('sqlens.mcp.clearActivity', () => mcpActivity?.clear()),
     { dispose: () => void mcpService?.dispose() },
     mcpActivity,
@@ -3173,6 +3172,73 @@ export function activate(context: vscode.ExtensionContext) {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         vscode.window.showErrorMessage(t('Failed to rename table: {0}', message));
+        return { ok: false, error: message };
+      }
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.copyTable', async (item?: any) => {
+      const resolved = resolveItemDriver(item);
+      if (!resolved) {
+        vscode.window.showErrorMessage(t('No table selected.'));
+        return { ok: false, error: 'no-table' };
+      }
+
+      const { driver, tableInfo } = resolved;
+      if (tableInfo.type && tableInfo.type !== 'table') {
+        vscode.window.showWarningMessage(t('Only tables can be copied.'));
+        return { ok: false, error: 'not-a-table' };
+      }
+
+      const currentName: string = tableInfo.name;
+      const defaultValue = `${currentName}_copy`;
+      const validate = (value: string): string | undefined => {
+        const name = value.trim();
+        if (!name) { return t('Table name cannot be empty.'); }
+        if (name === currentName) { return t('Enter a different name.'); }
+        if (!/^[\w$]+$/.test(name)) { return t('Use letters, digits, underscore or $ only.'); }
+        return undefined;
+      };
+
+      const newName = await vscode.window.showInputBox({
+        title: (t('Copy table "{0}"', currentName)),
+        prompt: 'Enter the new table name',
+        value: defaultValue,
+        valueSelection: [0, defaultValue.length],
+        validateInput: validate,
+      });
+      if (newName === undefined) { return { ok: false, error: 'cancelled' }; }
+
+      const target = newName.trim();
+      const invalid = validate(target);
+      if (invalid) { return { ok: false, error: invalid }; }
+
+      const schemaName: string | undefined = tableInfo.schema;
+      const qualified = schemaName
+        ? `${driver.escapeIdentifier(schemaName)}.${driver.escapeIdentifier(currentName)}`
+        : driver.escapeIdentifier(currentName);
+      const targetQualified = schemaName
+        ? `${driver.escapeIdentifier(schemaName)}.${driver.escapeIdentifier(target)}`
+        : driver.escapeIdentifier(target);
+
+      try {
+        // MySQL copies structure and data in two steps (LIKE + INSERT SELECT);
+        // PostgreSQL and SQLite can do it in one with CREATE TABLE AS SELECT.
+        if (driver.driverType === 'mysql') {
+          await driver.query(`CREATE TABLE ${targetQualified} LIKE ${qualified}`);
+          await driver.query(`INSERT INTO ${targetQualified} SELECT * FROM ${qualified}`);
+        } else {
+          await driver.query(`CREATE TABLE ${targetQualified} AS SELECT * FROM ${qualified}`);
+        }
+        vscode.window.showInformationMessage(t('Table "{0}" copied to "{1}".', currentName, target));
+        schemaTreeProvider.clearCache();
+        schemaTreeProvider.refresh();
+        schemaProvider.refresh();
+        return { ok: true, name: target };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        vscode.window.showErrorMessage(t('Failed to copy table: {0}', message));
         return { ok: false, error: message };
       }
     }),

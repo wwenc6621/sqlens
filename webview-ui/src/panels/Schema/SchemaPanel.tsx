@@ -117,6 +117,7 @@ function menuFor(node: SchemaNode, caps: SchemaCapabilities | null): MenuEntry[]
     entries.push(
       { command: 'divider', label: '' },
       { command: 'sqlens.renameTable', label: t('Rename') },
+      { command: 'sqlens.copyTable', label: t('Copy Table') },
       { command: 'divider', label: '' },
       { command: 'sqlens.truncateTable', label: t('Truncate Table'), danger: true },
       { command: 'sqlens.dropTable', label: t('Drop Table'), danger: true },

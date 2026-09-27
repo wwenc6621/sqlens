@@ -36,6 +36,7 @@
   "Edit Table Structure": "编辑表结构",
   "Show DDL": "查看 DDL",
   "Copy CREATE TABLE to Clipboard": "复制 CREATE TABLE 到剪贴板",
+  "Copy Table": "复制表",
   "Rename Table": "重命名表",
   "Switch Database": "切换数据库",
   "Refresh": "刷新",

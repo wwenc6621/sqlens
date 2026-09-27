@@ -84,20 +84,20 @@ export default function McpServerView({ instanceId = 'mcp-server' }: { instanceI
           >
             <input type="checkbox" checked={!data.readOnly} onChange={toggleReadOnly} />
             <span className="mcp-switch-track"><span className="mcp-switch-thumb" /></span>
-            <span className="mcp-switch-label">{data.readOnly ? t('Read-only') : t('Read & Write')}</span>
+            <span className="mcp-switch-label">{data.readOnly ? t('Read Only') : t('Read & Write')}</span>
           </label>
           <label
             className={`mcp-switch${autoApprove ? ' danger' : ''}${data.readOnly ? ' disabled' : ''}`}
             title={data.readOnly
               ? t('Switch to Read & Write first to enable writes')
               : (autoApprove
-                ? t('Writes execute without confirmation')
+                ? t('Auto-approve is on: AI writes (INSERT/UPDATE/DELETE/CREATE/ALTER) run without confirmation. DROP and TRUNCATE are still blocked.')
                 : t('Every write asks for confirmation'))}
           >
             <input type="checkbox" checked={autoApprove} disabled={data.readOnly} onChange={toggleAutoApprove} />
             <span className="mcp-switch-track"><span className="mcp-switch-thumb" /></span>
             <span className="mcp-switch-label">
-              {autoApprove ? t('Auto-approve') : t('Confirm writes')}
+              {autoApprove ? t('Auto Approve') : t('Confirm writes')}
             </span>
           </label>
         </div>
@@ -124,15 +124,6 @@ export default function McpServerView({ instanceId = 'mcp-server' }: { instanceI
         <div className="mcp-banner">
           <Icon name="lock" size={13} />
           <span>{t('MCP server is disabled in settings (sqlens.mcp.enabled). You can still start it manually below.')}</span>
-        </div>
-      )}
-
-      {autoApprove && !data.readOnly && (
-        <div className="mcp-banner danger">
-          <Icon name="zap" size={13} />
-          <span>
-            {t('Auto-approve is on: AI writes (INSERT/UPDATE/DELETE/CREATE/ALTER) run without confirmation. DROP and TRUNCATE are still blocked.')}
-          </span>
         </div>
       )}
 

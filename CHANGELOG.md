@@ -2,6 +2,18 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.3.6 (2026-09-27)
+
+### Added
+
+- **Copy Table in the Schema context menu.** Right-click → **Copy Table** prompts for a new name (default `{table}_copy`) and copies structure and data in one step — `CREATE TABLE ... LIKE` + `INSERT ... SELECT` on MySQL, `CREATE TABLE ... AS SELECT` on PostgreSQL/SQLite — then refreshes the schema tree.
+- **The MCP title-bar button now toggles the panel.** Clicking it opens the MCP Server panel as before; clicking again closes the tab while it is on screen.
+
+### Changed
+
+- **Write confirmations appear in the AI Activity panel only.** The duplicate non-modal notification was removed; the panel is still revealed and focused when a confirmation is pending (`sqlens.mcp.focusOnConfirm`), so requests can no longer be missed.
+- **MCP panel switch labels are no longer forced to uppercase** — they now read **Read Only**, **Read & Write**, **Auto Approve** and **Confirm writes**. The auto-approve explanation (including the DROP/TRUNCATE note) moved from the red banner into the switch's hover tooltip.
+
 ## 0.3.5 (2026-09-26)
 
 ### Added
