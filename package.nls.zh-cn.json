@@ -2,7 +2,7 @@
   "Sqlens SQLite Viewer": "Sqlens SQLite 查看器",
   "Sqlens": "Sqlens",
   "Connections": "连接",
-  "Saved SQL": "已保存 SQL",
+  "Queries": "查询",
   "Schema": "结构",
   "Query Results": "查询结果",
   "No connections yet.\n[Create Connection](command:sqlens.newConnection)": "还没有连接。\n[新建连接](command:sqlens.newConnection)",

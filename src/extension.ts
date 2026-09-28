@@ -584,6 +584,25 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
+  // Same double-click detection for database rows inside a connected
+  // connection: a single click only records the time, switching happens only
+  // when the same database row is clicked twice quickly.
+  const lastDbClick = new Map<string, number>();
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.databaseRowClick', (connectionId?: string, dbName?: string) => {
+      if (!connectionId || !dbName) { return; }
+      const key = `${connectionId}:${dbName}`;
+      const now = Date.now();
+      const previous = lastDbClick.get(key);
+      if (previous !== undefined && now - previous < DOUBLE_CLICK_MS) {
+        lastDbClick.delete(key);
+        void vscode.commands.executeCommand('sqlens.switchDatabase', connectionId, dbName);
+        return;
+      }
+      lastDbClick.set(key, now);
+    }),
+  );
+
   context.subscriptions.push(
     vscode.window.createTreeView('sqlens.savedQueries', {
       treeDataProvider: savedQueryTreeProvider,

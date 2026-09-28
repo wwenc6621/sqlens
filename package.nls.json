@@ -2,7 +2,7 @@
   "Sqlens SQLite Viewer": "Sqlens SQLite Viewer",
   "Sqlens": "Sqlens",
   "Connections": "Connections",
-  "Saved SQL": "Saved SQL",
+  "Queries": "Queries",
   "Schema": "Schema",
   "Query Results": "Query Results",
   "No connections yet.\n[Create Connection](command:sqlens.newConnection)": "No connections yet.\n[Create Connection](command:sqlens.newConnection)",

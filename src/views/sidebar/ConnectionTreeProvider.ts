@@ -205,10 +205,14 @@ export class DatabaseItem extends vscode.TreeItem {
     this.description = isActive ? 'active' : '';
     this.tooltip = isActive ? `${dbName} (active database)` : `Switch to ${dbName}`;
 
+    // Single click only records the click; the database is switched on
+    // double click (see sqlens.databaseRowClick in extension.ts). This matches
+    // the connection row behaviour so opening a database does not happen by
+    // accident while expanding/focusing the tree.
     if (!isActive) {
       this.command = {
-        command: 'sqlens.switchDatabase',
-        title: 'Switch Database',
+        command: 'sqlens.databaseRowClick',
+        title: t('Switch Database'),
         arguments: [connectionId, dbName],
       };
     }

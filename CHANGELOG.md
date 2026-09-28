@@ -2,6 +2,14 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.3.7 (2026-09-28)
+
+### Changed
+
+- **Connections 视图：展开数据库改为双击。** 单击数据库仅选中、不再误触切换；双击才切换为当前活动库（与未连接连接的双击连接行为一致）。
+- **侧边栏标题统一为单词形式。** “Saved SQL” 视图重命名为 **Queries**（中文「已保存 SQL」→「查询」），与 Connections / Schema 风格一致。
+- **Queries 视图欢迎页移除 “Create Connection” 链接**；「New Saved Query」改为标题栏的「新建」图标按钮（无选中连接时弹出连接选择框）。
+
 ## 0.3.6 (2026-09-27)
 
 ### Added
