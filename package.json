@@ -2,7 +2,7 @@
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
   "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis/ClickHouse/Elasticsearch/MongoDB/SQL Server connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
@@ -186,7 +186,7 @@
       },
       {
         "view": "sqlens.savedQueries",
-        "contents": "%A saved query is stored with its connection, so it is already on disk — no Save As needed.\n[New Saved Query](command:sqlens.newSavedQuery)%"
+        "contents": "%A saved query is stored with its connection, so it is already on disk — no Save As needed.%"
       }
     ],
     "commands": [

@@ -6,7 +6,7 @@
   "Schema": "Schema",
   "Query Results": "Query Results",
   "No connections yet.\n[Create Connection](command:sqlens.newConnection)": "No connections yet.\n[Create Connection](command:sqlens.newConnection)",
-  "A saved query is stored with its connection, so it is already on disk — no Save As needed.\n[New Saved Query](command:sqlens.newSavedQuery)": "A saved query is stored with its connection, so it is already on disk — no Save As needed.\n[New Saved Query](command:sqlens.newSavedQuery)",
+  "A saved query is stored with its connection, so it is already on disk — no Save As needed.": "A saved query is stored with its connection, so it is already on disk — no Save As needed.",
   "New Connection": "New Connection",
   "New Connection Folder": "New Connection Folder",
   "Rename Folder": "Rename Folder",

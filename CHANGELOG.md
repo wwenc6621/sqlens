@@ -2,6 +2,12 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.3.9 (2026-09-28)
+
+### Changed
+
+- **Queries 视图空状态不再显示 “New Saved Query” 链接**，只保留说明文字；新建入口统一在标题栏的「新建」图标按钮（0.3.7 引入）。
+
 ## 0.3.8 (2026-09-28)
 
 ### Fixed
