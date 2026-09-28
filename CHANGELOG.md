@@ -2,6 +2,12 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.3.8 (2026-09-28)
+
+### Fixed
+
+- **Queries 视图空状态文案显示了多余的 `%` 符号。** 移除 “Create Connection” 按钮后，本地化 key 与文案不一致导致 VS Code 找不到翻译条目，`%...%` 被原样渲染；已同步 nls key，中英文均正常显示。
+
 ## 0.3.7 (2026-09-28)
 
 ### Changed

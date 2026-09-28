@@ -6,7 +6,7 @@
   "Schema": "结构",
   "Query Results": "查询结果",
   "No connections yet.\n[Create Connection](command:sqlens.newConnection)": "还没有连接。\n[新建连接](command:sqlens.newConnection)",
-  "A saved query is stored with its connection, so it is already on disk — no Save As needed.\n[New Saved Query](command:sqlens.newSavedQuery)\n[Create Connection](command:sqlens.newConnection)": "已保存的查询与其连接一起存储在磁盘上，无需另存。\n[新建保存的查询](command:sqlens.newSavedQuery)\n[新建连接](command:sqlens.newConnection)",
+  "A saved query is stored with its connection, so it is already on disk — no Save As needed.\n[New Saved Query](command:sqlens.newSavedQuery)": "已保存的查询与其连接一起存储在磁盘上，无需另存。\n[新建保存的查询](command:sqlens.newSavedQuery)",
   "New Connection": "新建连接",
   "New Connection Folder": "新建连接文件夹",
   "Rename Folder": "重命名文件夹",
