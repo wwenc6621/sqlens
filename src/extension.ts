@@ -603,11 +603,12 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  context.subscriptions.push(
-    vscode.window.createTreeView('sqlens.savedQueries', {
+  const savedQueriesTreeView = vscode.window.createTreeView('sqlens.savedQueries', {
       treeDataProvider: savedQueryTreeProvider,
       showCollapseAll: true,
-    }),
+    });
+  context.subscriptions.push(
+    savedQueriesTreeView,
   );
 
   // The Schema sidebar is a webview: an inline filter box and in-place rename

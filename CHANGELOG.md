@@ -2,6 +2,12 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.4.0 (2026-09-28)
+
+### Fixed
+
+- **Connections 树的右键菜单项不再泄漏到其他扩展的树视图右键菜单。** 部分 VS Code 版本对菜单 `when` 条件中的负正则（`viewItem !~ /.../`）求值错误，导致 “Dump Database”“ER Diagram”“Open Terminal CLI”“Create Database” 等条目出现在无关树视图（例如同装 Pico 时，Pico 的请求列表右键菜单）里。0.4.0 为连接与数据库节点新增显式的 `:rdb` / `:nordb` 上下文标签，并把全部负正则条件改写为等价的肯定匹配（`viewItem =~ /:rdb$/`），不再依赖该缺陷运算符。
+
 ## 0.3.9 (2026-09-28)
 
 ### Changed

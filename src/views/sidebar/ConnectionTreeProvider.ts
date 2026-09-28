@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { t } from '../../core/i18n';
-import { ConnectionManager } from '../../core/connection/ConnectionManager';
+import { ConnectionManager, RELATIONAL_DRIVERS } from '../../core/connection/ConnectionManager';
 import { ConnectionConfig, DATABASE_TYPE_META, DatabaseType } from '../../core/types';
 
 type TreeItem = ConnectionGroupItem | ConnectionItem | DatabaseItem;
@@ -123,6 +123,11 @@ export class ConnectionItem extends vscode.TreeItem {
     // hide relational-only commands (ER diagram, structure editing, ...) on
     // non-relational connections.
     this.contextValue += `:${config.type}`;
+    // Explicit relational tag for context menus. Negative regex tests (`!~`)
+    // in menu `when` clauses are evaluated unreliably by recent VS Code builds
+    // (such items render in every tree view's context menu), so relational-only
+    // actions match this positive tag instead of excluding each driver.
+    this.contextValue += RELATIONAL_DRIVERS.includes(config.type) ? ':rdb' : ':nordb';
 
     // Disconnected rows connect on double click: the row command records the
     // click and connects only when clicked twice quickly (see
@@ -202,6 +207,7 @@ export class DatabaseItem extends vscode.TreeItem {
     // suffix lets relational-only actions (ER diagram, SQL dump) be hidden on
     // document/columnar/key-value connections.
     this.contextValue = `${isActive ? 'database-active' : 'database'}:${dbType ?? ''}`;
+    this.contextValue += dbType && RELATIONAL_DRIVERS.includes(dbType) ? ':rdb' : ':nordb';
     this.description = isActive ? 'active' : '';
     this.tooltip = isActive ? `${dbName} (active database)` : `Switch to ${dbName}`;
 
