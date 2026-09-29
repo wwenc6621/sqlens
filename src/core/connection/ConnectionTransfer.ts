@@ -1,6 +1,23 @@
 import * as vscode from 'vscode';
-import { ConnectionConfig, DatabaseType } from '../types';
+import { ConnectionConfig } from '../types';
 import { ConnectionStorage } from './ConnectionStorage';
+import { formatLabel, parseConnections } from './import';
+import { buildConnectionUri } from './import/uriUtils';
+
+/** Sanitized single-row preview for the import wizard (never carries secrets). */
+export interface ImportPreviewItem {
+  index: number;
+  name: string;
+  type: string;
+  host?: string;
+  port?: number;
+  username?: string;
+  hasPassword: boolean;
+  database?: string;
+  filepath?: string;
+  group?: string;
+  issues: string[];
+}
 
 /**
  * Import/export of connection configurations to a portable JSON file.
@@ -78,58 +95,76 @@ export class ConnectionTransfer {
     return target.fsPath;
   }
 
-  /** Import connections from a user-chosen file. Returns the number imported. */
-  async importConnections(): Promise<number> {
-    const source = await vscode.window.showOpenDialog({
-      title: 'Import Connections',
-      canSelectMany: false,
-      filters: { 'JSON files': ['json'] },
-    });
-    if (!source || source.length === 0) { return 0; }
+  /** Read the clipboard and import whatever format it contains. */
+  async importFromClipboard(): Promise<number> {
+    const text = await vscode.env.clipboard.readText();
+    if (!text || !text.trim()) {
+      vscode.window.showInformationMessage('Clipboard is empty — nothing to import.');
+      return 0;
+    }
+    return this.importFromText(text);
+  }
 
-    let parsed: unknown;
-    try {
-      const content = await vscode.workspace.fs.readFile(source[0]);
-      parsed = JSON.parse(Buffer.from(content).toString('utf8'));
-    } catch (err) {
-      vscode.window.showErrorMessage(`Cannot read connection file: ${err instanceof Error ? err.message : String(err)}`);
+  /**
+   * Format-agnostic import: sniffs JSON / URI / CSV-TSV / .env, lets the user
+   * pick which parsed entries to keep, then saves through the existing chain
+   * (enc: dropping, id regeneration, name de-duplication).
+   */
+  async importFromText(text: string): Promise<number> {
+    const result = parseConnections(text);
+    if (result.error) {
+      vscode.window.showErrorMessage(
+        `Import failed (${formatLabel(result.format)}): ${result.error}`,
+      );
       return 0;
     }
 
-    const incoming = extractConnections(parsed);
-    if (incoming.length === 0) {
-      vscode.window.showErrorMessage('No valid connections found in the file (each entry needs "name" and "type").');
-      return 0;
+    const incoming = result.connections;
+    // Non-fatal problems surface once, before the pick list.
+    const warnings = incoming.flatMap(c => c.issues.filter(i => i.severity === 'warning').map(i => i.message));
+    for (const message of [...new Set(warnings)].slice(0, 3)) {
+      console.warn(`[sqlens] import warning: ${message}`);
     }
 
     // Let the user pick which entries to import.
     const picked = await vscode.window.showQuickPick(
       incoming.map(c => ({
-        label: `${c.name || 'Untitled'} (${c.type})`,
-        description: c.host || c.filepath || '',
+        label: `${c.draft.name || 'Untitled'} (${c.draft.type})`,
+        description: [c.draft.host, c.draft.port, c.draft.filepath].filter(Boolean).join(':') + (c.issues.length > 0 ? '  ⚠' : ''),
+        detail: c.issues.map(i => i.message).join(' · ') || undefined,
         picked: true,
-        config: c,
+        config: c.draft,
       })),
-      { canPickMany: true, placeHolder: `Select connections to import (${incoming.length} found)`, title: 'Import Connections' },
+      {
+        canPickMany: true,
+        placeHolder: `Select connections to import (${incoming.length} found, ${formatLabel(result.format)}${warnings.length > 0 ? `, ${warnings.length} warning(s)` : ''})`,
+        title: 'Import Connections',
+      },
     );
     if (!picked || picked.length === 0) { return 0; }
 
+    return this.savePicked(picked.map(p => p.config));
+  }
+
+  /** Persist picked configs: enc: secrets dropped, ids regenerated, names de-duplicated. */
+  private async savePicked(pickedConfigs: ConnectionConfig[]): Promise<number> {
     const existing = await this.storage.getAll();
     const existingIds = new Set(existing.map(c => c.id));
     const existingNames = new Set(existing.map(c => (c.name || '').toLowerCase()));
 
     let imported = 0;
     const renamed: string[] = [];
-    for (const pick of picked) {
+    for (const pick of pickedConfigs) {
       const config: ConnectionConfig = {
-        ...pick.config,
-        id: existingIds.has(pick.config.id) ? generateConnectionId() : pick.config.id,
+        ...pick,
+        // Parser drafts carry no id; always ensure a fresh, unique one.
+        id: !pick.id || existingIds.has(pick.id) ? generateConnectionId() : pick.id,
         // Encrypted values from another machine are unreadable here — drop them.
-        password: isEncryptedValue(pick.config.password) ? undefined : pick.config.password,
+        password: isEncryptedValue(pick.password) ? undefined : pick.password,
         ssh: {
-          ...pick.config.ssh,
-          password: isEncryptedValue(pick.config.ssh.password) ? undefined : pick.config.ssh.password,
-          passphrase: isEncryptedValue(pick.config.ssh.passphrase) ? undefined : pick.config.ssh.passphrase,
+          ...pick.ssh,
+          password: isEncryptedValue(pick.ssh.password) ? undefined : pick.ssh.password,
+          passphrase: isEncryptedValue(pick.ssh.passphrase) ? undefined : pick.ssh.passphrase,
         },
       };
 
@@ -159,6 +194,83 @@ export class ConnectionTransfer {
     }
     return imported;
   }
+
+  /** Copy a connection as a standard URI (no secrets by default). */
+  async copyAsUri(): Promise<string | undefined> {
+    const all = await this.storage.getAll();
+    if (all.length === 0) {
+      vscode.window.showInformationMessage('No connections to copy.');
+      return undefined;
+    }
+    const picked = await vscode.window.showQuickPick(
+      all.map(c => ({
+        label: `${c.name || 'Untitled'} (${c.type})`,
+        description: c.host || c.filepath || '',
+        config: c,
+      })),
+      { placeHolder: 'Copy which connection as a URI?', title: 'Copy Connection URI' },
+    );
+    if (!picked) { return undefined; }
+
+    const uri = buildConnectionUri(picked.config, { includePassword: false });
+    await vscode.env.clipboard.writeText(uri);
+    vscode.window.showInformationMessage(`Connection URI copied (without password).`);
+    return uri;
+  }
+
+  /**
+   * Parse text for the import wizard preview. Passwords are never included —
+   * only a `hasPassword` flag. Deterministic order (index-stable) so
+   * `commitImport` can address entries by index.
+   */
+  getImportPreview(text: string): { format: string; error?: string; items: ImportPreviewItem[] } {
+    const result = parseConnections(text);
+    if (result.error) {
+      return { format: result.format, error: result.error, items: [] };
+    }
+    return {
+      format: result.format,
+      items: result.connections.map((c, index) => ({
+        index,
+        name: c.draft.name,
+        type: c.draft.type,
+        host: c.draft.host || undefined,
+        port: c.draft.port || undefined,
+        username: c.draft.username || undefined,
+        hasPassword: !!c.draft.password,
+        database: c.draft.database || undefined,
+        filepath: c.draft.filepath || undefined,
+        group: c.draft.group,
+        issues: c.issues.filter(i => i.severity === 'warning').map(i => i.message),
+      })),
+    };
+  }
+
+  /**
+   * Re-parse `text`, keep the entries addressed by `picks` (index + optional
+   * name/group overrides from the wizard), and save them through the
+   * standard chain. Returns the number imported.
+   */
+  async commitImport(
+    text: string,
+    picks: Array<{ index: number; name?: string; group?: string }>,
+  ): Promise<number> {
+    const result = parseConnections(text);
+    if (result.error || result.connections.length === 0) { return 0; }
+
+    const configs: ConnectionConfig[] = [];
+    for (const pick of picks) {
+      const parsed = result.connections[pick.index];
+      if (!parsed) { continue; }
+      configs.push({
+        ...parsed.draft,
+        name: pick.name?.trim() || parsed.draft.name,
+        group: pick.group?.trim() || parsed.draft.group,
+      });
+    }
+    if (configs.length === 0) { return 0; }
+    return this.savePicked(configs);
+  }
 }
 
 /** Strip secrets unless explicitly included; drop workspace-binding markers. */
@@ -179,25 +291,6 @@ function sanitizeForExport(config: ConnectionConfig, includeSecrets: boolean): C
     },
     options,
   };
-}
-
-/**
- * Accept `{ version, connections: [...] }` payloads as well as a bare array
- * (the shared connections file and `.sqlens.json` shapes).
- */
-function extractConnections(parsed: unknown): ConnectionConfig[] {
-  const list = Array.isArray(parsed)
-    ? parsed
-    : (parsed && typeof parsed === 'object' && Array.isArray((parsed as { connections?: unknown }).connections))
-        ? (parsed as { connections: unknown[] }).connections
-        : [];
-
-  return list.filter((entry): entry is ConnectionConfig =>
-    !!entry && typeof entry === 'object'
-    && typeof (entry as ConnectionConfig).name === 'string'
-    && typeof (entry as ConnectionConfig).type === 'string'
-    && Object.values(DatabaseType).includes((entry as ConnectionConfig).type as DatabaseType),
-  );
 }
 
 /** Values stored by the shared connection file are machine-bound (AES key file). */

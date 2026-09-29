@@ -14,6 +14,7 @@ Sqlens 是一个完全免费的 VS Code 扩展，用于浏览数据库、运行 
 - 连接 Redis 数据库（standalone / cluster / sentinel，支持 SSH 隧道与 TLS）。
 - 内置 SQLite 查看器，直接打开 `.db`、`.sqlite`、`.sqlite3` 文件。
 - 连接配置可导出/导入为 JSON 文件（默认不含密码，可选明文并二次确认），方便换机迁移。
+- **连接导入支持多种格式**（自动嗅探）：sqlens JSON、标准连接 URI（`mysql://` / `postgres://` / `redis://` 等）、CSV/TSV 网格（从 Excel/飞书复制连接清单直接粘贴，中英文表头均可）、`.env` 文件、**Spring `application.yml` / `application.properties` 数据源配置**，以及 **DBeaver / DataGrip（Copy Settings）/ Navicat（.ncx）/ TablePlus** 导出的一键迁移；两步导入向导支持预览确认，密码不在导出中的一律置空并提示。
 - 双击侧边栏中未连接的连接即可连接（单击仅选中）。
 - 浏览库、表、视图、列、索引、外键；双击连接下的数据库可切换为当前活动库（单击仅选中）。
 - **Queries** 侧边栏（原 Saved SQL）保存带所属连接的查询，标题栏「新建」图标可创建查询。

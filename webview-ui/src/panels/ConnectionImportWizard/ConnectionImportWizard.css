@@ -1,0 +1,246 @@
+/* Connection Import Wizard — follows VS Code theme variables (see ConnectionForm.css) */
+
+.ciw {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 20px 32px;
+  font-size: 13px;
+  color: var(--vscode-foreground);
+}
+
+.ciw-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+
+/* Step 1: drop zone */
+.ciw-dropzone {
+  border: 1px dashed var(--vscode-input-border, var(--vscode-foreground));
+  border-radius: 6px;
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.ciw-dropzone:hover,
+.ciw-dropzone.dragover {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-list-hoverBackground);
+}
+.ciw-dropzone-icon {
+  font-size: 26px;
+  margin-bottom: 6px;
+}
+.ciw-dropzone-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.ciw-dropzone-hint {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.ciw-section-title {
+  margin: 18px 0 6px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.ciw-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 3px;
+  padding: 8px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  resize: vertical;
+}
+.ciw-textarea:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+}
+
+.ciw-error {
+  margin-top: 8px;
+  color: var(--vscode-errorForeground);
+  font-size: 12px;
+}
+
+.ciw-options {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+.ciw-options label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  font-size: 12px;
+}
+
+.ciw input[type='text'] {
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.ciw input[type='text']:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+}
+
+.ciw-btn,
+.ciw-btn-primary {
+  border: none;
+  border-radius: 3px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ciw-btn {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+.ciw-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+.ciw-btn-primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+.ciw-btn-primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+.ciw-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ciw-next {
+  width: 100%;
+  margin-top: 16px;
+}
+
+/* Step 2: preview */
+.ciw-meta {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-bottom: 10px;
+}
+.ciw-warn-badge {
+  margin-left: 8px;
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.ciw-list {
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.ciw-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--vscode-input-border);
+}
+.ciw-row:last-child {
+  border-bottom: none;
+}
+.ciw-row.selected {
+  background: var(--vscode-list-hoverBackground);
+}
+.ciw-row input[type='checkbox'] {
+  margin-top: 3px;
+}
+.ciw-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.ciw-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ciw-type {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  text-transform: uppercase;
+}
+.ciw-name {
+  font-weight: 600;
+}
+.ciw-host,
+.ciw-user {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.ciw-user::before {
+  content: '@ ';
+}
+.ciw-issue {
+  color: var(--vscode-editorWarning-foreground);
+  cursor: help;
+}
+
+.ciw-row-edit {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.ciw-row-edit label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  opacity: 0.9;
+}
+.ciw-row-issues {
+  width: 100%;
+  font-size: 11px;
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.ciw-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  gap: 12px;
+}
+.ciw-summary {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.ciw-footer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Done */
+.ciw-done {
+  text-align: center;
+  padding: 60px 0;
+}
+.ciw-done-icon {
+  width: 56px;
+  height: 56px;
+  line-height: 56px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  font-size: 28px;
+  background: var(--vscode-testing-iconPassed, #2ecc71);
+  color: #fff;
+}

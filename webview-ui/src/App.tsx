@@ -1,5 +1,6 @@
 import React from 'react';
 import ConnectionForm from './panels/ConnectionForm/ConnectionForm';
+import ConnectionImportWizard from './panels/ConnectionImportWizard/ConnectionImportWizard';
 import PanelHost from './components/PanelHost';
 import StructureView from './panels/StructureView/StructureView';
 import ERDiagram from './panels/ERDiagram/ERDiagram';
@@ -20,6 +21,8 @@ export default function App() {
   switch (panelType) {
     case 'connectionForm':
       return <ConnectionForm />;
+    case 'importWizard':
+      return <ConnectionImportWizard />;
     case 'dataGrid':
       return <PanelHost />;
     case 'structureView':

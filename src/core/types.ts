@@ -249,13 +249,18 @@ export type ExtensionMessage =
   | { type: 'structureData'; data: { tableName: string; schemaName?: string; columns: ColumnInfo[]; indexes: IndexInfo[]; foreignKeys: ForeignKeyInfo[]; ddl: string } }
   | { type: 'reloadStructure' }
   | { type: 'sshHosts'; data: any[] }
+  | { type: 'connectionGroups'; data: { groups: string[] } }
   | { type: 'quickViewData'; data: { columns: any[]; rowData: any[] } }
   | { type: 'rowSelected'; data: { columns: any[]; rowData: any[] } }
   | { type: 'pageData'; page: number; data: QueryResult; sortState?: any }
   | { type: 'ddlData'; data: { ddl: string } }
   | { type: 'totalRowsCount'; data: { totalRows: number } }
   | { type: 'driverType'; data: { type: string } }
-  | { type: 'tableList'; data: { tables: TableInfo[] } };
+  | { type: 'tableList'; data: { tables: TableInfo[] } }
+  | { type: 'importWizardParseResult'; data: { format: string; error?: string; items: Array<{ index: number; name: string; type: string; host?: string; port?: number; username?: string; hasPassword: boolean; database?: string; filepath?: string; group?: string; issues: string[] }> } }
+  | { type: 'importWizardText'; data: { text: string } }
+  | { type: 'importWizardDone'; data: { imported: number } }
+  | { type: 'importWizardGroups'; data: { groups: string[] } };
 
 export type WebviewMessage =
   | { type: 'executeQuery'; data: { sql: string; connectionId: string } }
@@ -278,7 +283,11 @@ export type WebviewMessage =
   | { type: 'getTableList'; data?: { schemaName?: string } }
   | { type: 'executeCreateTable'; data: { sql: string; tableName: string; schemaName?: string } }
   | { type: 'saveImage'; data: { base64: string; fileName: string } }
-  | { type: 'exportQueryResults'; data: { format: 'csv' | 'json' | 'sql'; columns: string[]; rows: unknown[][]; tableName?: string } };
+  | { type: 'exportQueryResults'; data: { format: 'csv' | 'json' | 'sql'; columns: string[]; rows: unknown[][]; tableName?: string } }
+  | { type: 'importWizardParse'; data: { text: string } }
+  | { type: 'importWizardCommit'; data: { text: string; picks: Array<{ index: number; name?: string; group?: string }> } }
+  | { type: 'importWizardReadClipboard' }
+  | { type: 'importWizardGetGroups' };
 
 export interface SortConfig {
   column: string;

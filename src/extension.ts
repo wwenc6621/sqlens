@@ -994,9 +994,16 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(`Connections exported to ${file}`);
       }
     }),
-    vscode.commands.registerCommand('sqlens.importConnections', async () => {
+    vscode.commands.registerCommand('sqlens.importConnectionsFromClipboard', async () => {
       const transfer = new ConnectionTransfer(new ConnectionStorage(context));
-      await transfer.importConnections();
+      await transfer.importFromClipboard();
+    }),
+    vscode.commands.registerCommand('sqlens.copyConnectionAsUri', async () => {
+      const transfer = new ConnectionTransfer(new ConnectionStorage(context));
+      await transfer.copyAsUri();
+    }),
+    vscode.commands.registerCommand('sqlens.importConnectionsWizard', () => {
+      openImportWizard();
     }),
   );
 
@@ -3715,6 +3722,36 @@ export function activate(context: vscode.ExtensionContext) {
     return String(value).replace(/\t/g, ' ').replace(/\r?\n/g, ' ');
   }
 
+  function openImportWizard() {
+    const panelId = 'import-wizard';
+    webviewManager.showPanel(panelId, 'Import Connections', 'importWizard', async (message: WebviewMessage) => {
+      const transfer = new ConnectionTransfer(new ConnectionStorage(context));
+      switch (message.type) {
+        case 'importWizardParse': {
+          const preview = transfer.getImportPreview(message.data.text);
+          webviewManager.postMessage(panelId, { type: 'importWizardParseResult', data: preview });
+          break;
+        }
+        case 'importWizardCommit': {
+          const imported = await transfer.commitImport(message.data.text, message.data.picks);
+          webviewManager.postMessage(panelId, { type: 'importWizardDone', data: { imported } });
+          break;
+        }
+        case 'importWizardReadClipboard': {
+          const text = await vscode.env.clipboard.readText();
+          webviewManager.postMessage(panelId, { type: 'importWizardText', data: { text: text || '' } });
+          break;
+        }
+        case 'importWizardGetGroups': {
+          const all = await new ConnectionStorage(context).getAll();
+          const groups = [...new Set(all.map(c => c.group).filter((g): g is string => !!g))].sort();
+          webviewManager.postMessage(panelId, { type: 'importWizardGroups', data: { groups } });
+          break;
+        }
+      }
+    });
+  }
+
   function openConnectionForm(config: ConnectionConfig) {
     const panelId = `connection-form-${config.id || 'new'}`;
     const title = config.name ? `Edit: ${config.name}` : 'New Connection';
@@ -3745,6 +3782,13 @@ export function activate(context: vscode.ExtensionContext) {
             webviewManager.postMessage(panelId, { type: 'sshHosts', data: sshHosts });
           } catch (err) {
             Logger.getInstance().logError('Failed to send SSH hosts to connection form', err);
+          }
+          try {
+            const allConns = await new ConnectionStorage(context).getAll();
+            const groups = [...new Set(allConns.map(c => c.group).filter((g): g is string => !!g))].sort();
+            webviewManager.postMessage(panelId, { type: 'connectionGroups', data: { groups } });
+          } catch (err) {
+            Logger.getInstance().logError('Failed to send connection groups to connection form', err);
           }
           break;
       }

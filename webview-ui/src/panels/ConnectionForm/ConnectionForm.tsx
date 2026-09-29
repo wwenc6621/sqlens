@@ -63,16 +63,6 @@ const SSL_MODES = [
   { value: 'verify-full', label: t('Verify Full') },
 ];
 
-const COLORS = [
-  { value: '', label: t('None') },
-  { value: '#e74c3c', label: t('Red') },
-  { value: '#e67e22', label: t('Orange') },
-  { value: '#f1c40f', label: t('Yellow') },
-  { value: '#2ecc71', label: t('Green') },
-  { value: '#3498db', label: t('Blue') },
-  { value: '#9b59b6', label: t('Purple') },
-];
-
 const REDIS_MODES = [
   { value: 'standalone', label: t('Standalone') },
   { value: 'cluster', label: t('Cluster') },
@@ -119,6 +109,7 @@ export default function ConnectionForm() {
   const [testing, setTesting] = useState(false);
   const [sshHosts, setSSHHosts] = useState<SSHConfigHost[]>([]);
   const [selectedSSHHost, setSelectedSSHHost] = useState<string>('');
+  const [existingGroups, setExistingGroups] = useState<string[]>([]);
 
   useEffect(() => {
     // Signal readiness to extension
@@ -129,6 +120,8 @@ export default function ConnectionForm() {
         setForm({ ...defaultForm, ...msg.data, password: msg.data.password || '' });
       } else if (msg.type === 'sshHosts') {
         setSSHHosts(msg.data || []);
+      } else if (msg.type === 'connectionGroups') {
+        setExistingGroups(msg.data?.groups || []);
       }
     });
 
@@ -772,32 +765,17 @@ export default function ConnectionForm() {
 
         {activeTab === 'advanced' && (
           <div className="form-grid">
+            <datalist id="cf-existing-groups">
+              {existingGroups.map(g => <option key={g} value={g} />)}
+            </datalist>
             <div className="form-field">
               <label>{t('Group')}</label>
               <input
                 type="text"
+                list="cf-existing-groups"
                 value={form.group || ''}
                 onChange={e => updateField('group', e.target.value)}
                 placeholder={t('Production, Staging, Local...')}
-              />
-            </div>
-
-            <div className="form-field">
-              <label>{t('Color Label')}</label>
-              <select value={form.color || ''} onChange={e => updateField('color', e.target.value)}>
-                {COLORS.map(c => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-field">
-              <label>{t('Tags (comma-separated)')}</label>
-              <input
-                type="text"
-                value={form.tags.join(', ')}
-                onChange={e => updateField('tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
-                placeholder="backend, shared, read-only"
               />
             </div>
           </div>

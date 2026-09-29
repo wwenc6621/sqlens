@@ -14,6 +14,7 @@ It works in VS Code and VS Code forks such as Trae, and the UI follows your edit
 - Connect to Redis (standalone / cluster / sentinel, with SSH tunneling and TLS).
 - Open `.db`, `.sqlite`, and `.sqlite3` files with the built-in SQLite viewer.
 - Export/import connection configurations as JSON (passwords excluded by default; plaintext requires a confirmation) for moving between machines.
+- **Multi-format connection import** with automatic format sniffing: sqlens JSON, standard connection URIs (`mysql://` / `postgres://` / `redis://` / …), CSV/TSV grids (copy a block of connections straight out of Excel or the DataGrid; English and Chinese headers both supported), `.env` files, **Spring `application.yml` / `application.properties` datasource configs**, and one-click migration from **DBeaver / DataGrip (Copy Settings) / Navicat (.ncx) / TablePlus** exports. A two-step import wizard shows a preview with warnings before saving; unavailable passwords are left empty and flagged.
 - Double-click a disconnected connection in the sidebar to connect (a single click only selects).
 - Browse schemas, tables, views, columns, indexes, and foreign keys.
 - Schema panel: inline filter (`*` / `?` wildcards), in-place table rename, one-click table copy (structure + data), full hover details, and a driver-aware context menu.

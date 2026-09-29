@@ -451,6 +451,29 @@ const zh: Record<string, string> = {
   'TTL': 'TTL',
   'Double-click to open the table': '双击打开数据表',
   'Double-click to open entries': '双击打开内容',
+  // DataGrid (missing translations)
+  'Copy Table': '复制表',
+  // Connection Import Wizard
+  'Import Connections': '导入连接',
+  'Choose a file or drag it here': '选择文件或拖拽到此处',
+  'Supported formats': '支持格式',
+  'Or paste content (URIs, JSON, table rows, .env…)': '或粘贴内容（连接 URI、JSON、表格行、.env…）',
+  'Import into group': '导入到分组',
+  'leave empty for default group': '留空使用默认分组',
+  'Read clipboard': '读取剪贴板',
+  'Parsing…': '解析中…',
+  'Next: Preview': '下一步：预览',
+  'Preview connections': '预览连接',
+  'Source': '来源',
+  'found': '条',
+  'selected': '已选择',
+  'Passwords will be imported empty when unavailable': '无法获取的密码将以空值导入，连接前请手动补齐',
+  'Back': '上一步',
+  'Import': '导入',
+  'Import complete': '导入完成',
+  'connection imported': '个连接已导入',
+  'connections imported': '个连接已导入',
+  'Import more': '继续导入',
 
 };
 

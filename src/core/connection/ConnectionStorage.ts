@@ -52,7 +52,7 @@ export class ConnectionStorage {
 
   async getAll(): Promise<ConnectionConfig[]> {
     const globalConnections = this.filterForCurrentWorkspace(
-      this.readGlobalConnections()
+      this.healMissingIds(this.readGlobalConnections())
     );
 
     const projectStorage = new ProjectConnectionStorage(this.context);
@@ -164,6 +164,23 @@ export class ConnectionStorage {
 
   private async getAllWithoutPasswords(): Promise<ConnectionConfig[]> {
     return this.context.globalState.get<ConnectionConfig[]>(CONNECTIONS_KEY, []);
+  }
+
+  /**
+   * Self-heal connections saved without an id (e.g. by older import versions):
+   * assign a fresh id and persist, so drag-to-group and delete can address them.
+   */
+  private healMissingIds(connections: ConnectionConfig[]): ConnectionConfig[] {
+    let changed = false;
+    const healed = connections.map(c => {
+      if (c.id) { return c; }
+      changed = true;
+      return { ...c, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
+    });
+    if (changed) {
+      this.writeGlobalConnections(healed);
+    }
+    return healed;
   }
 
   private filterForCurrentWorkspace(connections: ConnectionConfig[]): ConnectionConfig[] {

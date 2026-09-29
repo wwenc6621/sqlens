@@ -2,6 +2,28 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.4.1 (2026-09-29)
+
+### Added
+
+- **连接导入全面增强（新解析管线）**：导入不再局限于 sqlens JSON，新增统一的格式嗅探管线（`parseConnections`），粘贴或选择文件后自动识别格式，复用既有的保存链路（机器绑定 `enc:` 密文丢弃、ID 冲突重生成、名称去重）。
+- **连接 URI 导入**：支持 `mysql://`、`postgres://`、`redis://`、`rediss://`（自动 TLS）、`mongodb+srv://`、`sqlserver://`、`clickhouse://`、`es://`、`sqlite://` 等标准连接串，逐行批量解析；`sslmode` 参数映射到 SSL 配置，`ssh=true&ssh_host=...` 扩展参数映射 SSH 隧道。
+- **CSV / TSV 网格导入**：从 Excel / 飞书表格 / DataGrid 复制一块连接清单（一行一个连接）直接粘贴导入，支持中英文表头别名（名称/主机/端口/用户名/密码/数据库/分组/标签/跳板机等），引号转义兼容 RFC 4180；无可识别表头时拒绝解析，避免静默错配。
+- **`.env` 文件导入**：识别 `DATABASE_URL=mysql://...` 类 URL 键与 `MYSQL_HOST/PORT/USER/PASSWORD/DB` 类拆解键，前缀归组推断数据库类型。
+- **后端配置文件导入（Spring）**：直接粘贴 `application.yml` / `application.properties` —— 解析 `spring.datasource.url`（JDBC URL + `useSSL`/`sslmode` 映射，其余参数进 options）与 `spring.datasource.username/password`；同时支持 `spring.redis.*`、`spring.data.redis.*`、`spring.data.mongodb.*`、`spring.elasticsearch.uris` 等拆解键（YAML 按缩进作用域归组，配置文件中的明文密码按原样导入）。
+- **第三方工具迁移**：
+  - **DBeaver**：`data-sources.json`（含 JDBC URL 兜底解析）。
+  - **DataGrip**：右键连接 → Copy Settings 的 `#DataSourceSettings#` 输出，直接粘贴即可（`jdbc-url` 属性/元素两种形态、`&amp;` 实体解码、`useSSL=false` → SSL 关闭，其余 JDBC 参数进 options）。
+  - **Navicat**：明文 `.ncx`（per-provider 标签与 `<server><general>` 两种形态，SQLite 文件路径属性）。
+  - **TablePlus**：导出 JSON（裸数组或 `Connections` 数组，字段别名大小写不敏感，SSL/SSH 字段映射）。
+  - 四个工具的密码均不在导入范围内（Navicat 加密、TablePlus 在 Keychain、DataGrip/DBeaver 不导出），一律置空并在预览中以 ⚠ 提示，连接前手动补齐。
+- **导入向导面板**：新的两步导入页（命令 `Sqlens: Import Connections…`，连接视图标题栏新按钮）——第一步拖放文件或粘贴内容、实时嗅探、选择目标分组；第二步预览确认（勾选、问题标记、行内改名/分组），密码永不回显。原 QuickPick 导入与格式化对话框保留为快速路径。
+- **新命令** `Sqlens: Import Connections from Clipboard`（剪贴板自动嗅探导入）与 `Sqlens: Copy Connection as URI`（复制连接为标准 URI，不含密码）。
+
+### Fixed
+
+- 修复一条 webview 文案（"Copy Table"）缺失中文翻译导致的 i18n 覆盖测试失败。
+
 ## 0.4.0 (2026-09-28)
 
 ### Fixed
