@@ -19,6 +19,7 @@ interface McpStatusData {
   token: string;
   readOnly: boolean;
   writeMode: string;
+  confirmNotification: string;
   maxRows: number;
   registeredAssistants: RegisteredAssistant[];
   activity: { entries: number; pending: number };
@@ -51,6 +52,7 @@ export default function McpServerView({ instanceId = 'mcp-server' }: { instanceI
   const register = () => post({ type: 'mcpRegister' });
   const toggleReadOnly = () => post({ type: 'mcpToggleReadOnly', data: { readOnly: !data?.readOnly } });
   const toggleAutoApprove = () => post({ type: 'mcpToggleAutoApprove', data: { autoApprove: data?.writeMode !== 'allow' } });
+  const setConfirmNotification = (value: string) => post({ type: 'mcpSetConfirmNotification', data: { confirmNotification: value } });
   const openActivity = () => post({ type: 'mcpOpenActivity' });
 
   if (!data) {
@@ -100,6 +102,28 @@ export default function McpServerView({ instanceId = 'mcp-server' }: { instanceI
               {autoApprove ? t('Auto Approve') : t('Confirm writes')}
             </span>
           </label>
+          {/* Confirmation display location — only relevant when writes ask
+              for confirmation (Auto Approve off). */}
+          {!autoApprove && !data.readOnly && (
+            <div
+              className="mcp-segmented"
+              title={t('Where to show write confirmations')}
+              role="radiogroup"
+            >
+              <button
+                className={`mcp-segment${(data.confirmNotification || 'panel') === 'panel' ? ' active' : ''}`}
+                onClick={() => setConfirmNotification('panel')}
+              >
+                {t('In AI Activity panel')}
+              </button>
+              <button
+                className={`mcp-segment${data.confirmNotification === 'notification' ? ' active' : ''}`}
+                onClick={() => setConfirmNotification('notification')}
+              >
+                {t('System notification bar')}
+              </button>
+            </div>
+          )}
         </div>
         <div className="mcp-header-actions">
           <button className="mcp-icon-btn" onClick={refresh} title={t('Refresh')}>

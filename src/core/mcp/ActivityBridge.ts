@@ -169,6 +169,10 @@ export class ActivityBridge {
   getEntries(): AiActivityEntry[] { return this.entries; }
 
   getPendingWrites(): PendingWrite[] {
+    // Notification-bar mode: the confirmation happens in the system
+    // notification, so no inline card is surfaced in the panel.
+    const display = vscode.workspace.getConfiguration('sqlens.mcp').get<string>('confirmNotification', 'panel');
+    if (display === 'notification') { return []; }
     return [...this.pending.values()].map(p => p.request).sort((a, b) => b.timestamp - a.timestamp);
   }
 
@@ -177,7 +181,9 @@ export class ActivityBridge {
    * (inline card). Resolves true if allowed, false on deny/timeout.
    */
   async requestWriteConfirmation(sql: string, client: string, connectionName?: string): Promise<boolean> {
-    const timeoutMs = vscode.workspace.getConfiguration('sqlens.mcp').get<number>('autoConfirmTimeout', 120) * 1000;
+    const cfg = vscode.workspace.getConfiguration('sqlens.mcp');
+    const timeoutMs = cfg.get<number>('autoConfirmTimeout', 120) * 1000;
+    const display = cfg.get<string>('confirmNotification', 'panel');
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const request: PendingWrite = { id, timestamp: Date.now(), client, tool: 'write_query', sql, connectionName, timeoutMs };
 
@@ -185,6 +191,17 @@ export class ActivityBridge {
       const timer = setTimeout(() => this.resolvePending(id, false, 'timeout'), timeoutMs);
       this.pending.set(id, { request, resolve, timer });
       this._onDidChange.fire();
+
+      // Notification-bar mode: prompt outside the panel. The inline card is
+      // still tracked so the panel and the timeout stay consistent.
+      if (display === 'notification') {
+        const title = `Sqlens: AI (${client}) wants to execute a write statement${connectionName ? ` on "${connectionName}"` : ''}`;
+        void vscode.window.showInformationMessage(title, { detail: sql, modal: false }, 'Allow', 'Deny').then(choice => {
+          if (choice === 'Allow') { this.resolvePending(id, true); }
+          else if (choice === 'Deny') { this.resolvePending(id, false); }
+          // Dismissed without a choice: the timeout auto-denies.
+        });
+      }
     });
   }
 
@@ -195,22 +212,26 @@ export class ActivityBridge {
     clearTimeout(entry.timer);
     this.pending.delete(id);
 
-    this.entries.unshift({
-      id,
-      timestamp: Date.now(),
-      tool: entry.request.tool,
-      client: entry.request.client,
-      argsSummary: JSON.stringify({ sql: entry.request.sql }),
-      sql: entry.request.sql,
-      connectionName: entry.request.connectionName,
-      durationMs: 0,
-      success: allowed,
-      error: reason === 'timeout' ? 'Confirmation timed out' : (allowed ? undefined : 'Denied by user'),
-      blocked: !allowed,
-    });
-    this.entries = this.entries.slice(0, MAX_ACTIVITY);
+    // Audit entry only for denials/timeouts — an allowed write produces its
+    // own execution entry via `record`, so logging it here would duplicate.
+    if (!allowed) {
+      this.entries.unshift({
+        id,
+        timestamp: Date.now(),
+        tool: entry.request.tool,
+        client: entry.request.client,
+        argsSummary: JSON.stringify({ sql: entry.request.sql }),
+        sql: entry.request.sql,
+        connectionName: entry.request.connectionName,
+        durationMs: 0,
+        success: false,
+        error: reason === 'timeout' ? 'Confirmation timed out' : 'Denied by user',
+        blocked: true,
+      });
+      this.entries = this.entries.slice(0, MAX_ACTIVITY);
+      this.persist();
+    }
     this.channel.appendLine(`[AI] write_query ${allowed ? 'ALLOWED' : 'DENIED'}${reason === 'timeout' ? ' (timeout)' : ''}: ${entry.request.sql}`);
-    this.persist();
     this._onDidChange.fire();
     entry.resolve(allowed);
     return true;

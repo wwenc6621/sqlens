@@ -29,6 +29,9 @@ const zh: Record<string, string> = {
   'Writes execute without confirmation': '写操作无需确认，直接执行',
   'Every write asks for confirmation': '每次写操作都需要确认',
   'Auto-approve is on: AI writes (INSERT/UPDATE/DELETE/CREATE/ALTER) run without confirmation. DROP and TRUNCATE are still blocked.': '自动批准已开启：AI 的写操作（INSERT/UPDATE/DELETE/CREATE/ALTER）将不再询问而直接执行。DROP 与 TRUNCATE 仍被禁止。',
+  'Where to show write confirmations': '写确认提示的显示位置',
+  'In AI Activity panel': '在 AI Activity 面板',
+  'System notification bar': '系统通知栏',
   // DataGrid
   'Preparing data grid': '正在准备数据表格',
   'No Results': '无结果',

@@ -737,6 +737,7 @@ export function activate(context: vscode.ExtensionContext) {
       token: status.token,
       readOnly,
       writeMode,
+      confirmNotification: cfg.get<string>('confirmNotification', 'panel'),
       maxRows,
       registeredAssistants: registered,
       activity,
@@ -757,6 +758,11 @@ export function activate(context: vscode.ExtensionContext) {
       mcpTabActive = false;
       return;
     }
+    // Focus the Sqlens panel container first so the webview becomes visible —
+    // the same pattern the AI Activity flow uses. Otherwise, clicking the MCP
+    // button in the Connections view posts the tab into a hidden panel and
+    // nothing appears to happen.
+    void vscode.commands.executeCommand('sqlens.queryResultsView.focus');
     postMcpStatus(true);
   }
 
@@ -820,6 +826,14 @@ export function activate(context: vscode.ExtensionContext) {
             postMcpStatus(false);
             return;
           }
+          case 'mcpSetConfirmNotification': {
+            // Where write confirmations show up: inline card in the AI
+            // Activity panel, or a system notification with Allow/Deny.
+            const next = msg.data?.confirmNotification === 'notification' ? 'notification' : 'panel';
+            await vscode.workspace.getConfiguration('sqlens.mcp').update('confirmNotification', next, vscode.ConfigurationTarget.Global);
+            postMcpStatus(false);
+            return;
+          }
           case 'mcpOpenActivity':
             postAiActivityData(true);
             return;
@@ -874,7 +888,10 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    const focusOnConfirm = cfg.get<boolean>('focusOnConfirm', true);
+    // Only hijack focus when confirmations are surfaced in the panel; the
+    // notification-bar mode reaches the user on its own.
+    const confirmDisplay = cfg.get<string>('confirmNotification', 'panel');
+    const focusOnConfirm = confirmDisplay === 'panel' && cfg.get<boolean>('focusOnConfirm', true);
     if (focusOnConfirm) {
       // Focusing the container makes the webview visible; `activate` then
       // switches it to the AI Activity tab.

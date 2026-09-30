@@ -292,13 +292,15 @@ export class McpService {
 
   private async listConnections() {
     const configs = await this.connectionManager.getSavedConnections();
-    return configs.map(c => ({
-      id: c.id,
-      name: c.name || c.host,
-      type: c.type,
-      database: c.database || '',
-      connected: this.connectionManager.isConnected(c.id),
-    }));
+    return configs
+      .filter(c => this.connectionManager.isConnected(c.id))
+      .map(c => ({
+        id: c.id,
+        name: c.name || c.host,
+        type: c.type,
+        database: c.database || '',
+        connected: true,
+      }));
   }
 
   private async getDriver(connectionId?: string): Promise<ResolvedConnection> {
@@ -456,10 +458,16 @@ export class McpService {
     // ── list_connections ──
     mcp.tool(
       'list_connections',
-      'List all database connections configured in Sqlens. Returns id, name, type, database and connected status. Never returns credentials.',
+      'List database connections that are currently connected (open) in Sqlens. Connections that are configured but not connected are not listed — ask the user to connect them in the Sqlens panel first. Returns id, name, type and database. Never returns credentials.',
       {},
       async () => {
         const connections = await withActivity('list_connections', {}, () => this.listConnections());
+        if (connections.length === 0) {
+          return textResult({
+            connections: [],
+            message: 'No connections are currently connected. Please ask the user to open (connect) a connection in the Sqlens extension, then call list_connections again.',
+          });
+        }
         return textResult({ connections });
       },
     );
@@ -477,6 +485,26 @@ export class McpService {
           return conn.driver.getDatabases();
         }, { connectionId: args?.connectionId });
         return textResult({ databases });
+      },
+    );
+
+    // ── use_database ──
+    mcp.tool(
+      'use_database',
+      'Switch the current database on a connected connection. Call list_databases first to see the available databases.',
+      {
+        connectionId: z.string().optional().describe('Connection id from list_connections. Omit or "current" for the active connection.'),
+        database: z.string().describe('Database name to switch to.'),
+      },
+      async (args) => {
+        const result = await withActivity('use_database', args, async () => {
+          const conn = await this.getDriver(args.connectionId);
+          this.connectionManager.setActiveConnection(conn.id);
+          await conn.driver.switchDatabase(args.database);
+          const current = await conn.driver.getCurrentDatabase().catch(() => args.database);
+          return { connectionId: conn.id, connectionName: conn.name, database: current };
+        }, { connectionId: args?.connectionId });
+        return textResult(result);
       },
     );
 

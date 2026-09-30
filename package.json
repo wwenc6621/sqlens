@@ -2,7 +2,7 @@
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
   "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis/ClickHouse/Elasticsearch/MongoDB/SQL Server connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
@@ -1043,9 +1043,17 @@
           "description": "%Bring the AI Activity panel into focus when a write needs your confirmation%"
         },
         "sqlens.mcp.confirmNotification": {
-          "type": "boolean",
-          "default": true,
-          "description": "%Also show a notification with Allow/Deny buttons when a write needs your confirmation%"
+          "type": "string",
+          "enum": [
+            "panel",
+            "notification"
+          ],
+          "default": "panel",
+          "description": "%Where to show write-confirmation prompts: \"panel\" shows the inline Allow/Deny card in the AI Activity panel, \"notification\" shows a system notification with Allow/Deny buttons%",
+          "enumDescriptions": [
+            "%Show the confirmation card in the AI Activity panel%",
+            "%Show a system notification with Allow/Deny buttons%"
+          ]
         },
         "sqlens.mcp.maxRows": {
           "type": "number",
