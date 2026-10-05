@@ -272,5 +272,19 @@
   "Enter a number between 1 and 1000": "请输入 1 到 1000 之间的数字",
   "No writable columns found on this table.": "该表没有可写入的列。",
   "Generated {0} INSERT statements — review, then run.": "已生成 {0} 条 INSERT 语句，请确认后执行。",
-  "Failed to generate data: {0}": "生成数据失败：{0}"
+  "Failed to generate data: {0}": "生成数据失败：{0}",
+  "Chart": "图表",
+  "Nothing to visualize here.": "这里没有可用于可视化的数据。",
+  "Save as query": "保存为查询",
+  "This tab has no query to save.": "当前标签页没有可保存的查询。",
+  "This result is not tied to a connection.": "该结果未关联到任何连接。",
+  "Nothing to add to a dashboard from this tab.": "当前标签页没有可加入仪表盘的内容。",
+  "Open a query result or chart first.": "请先打开一个查询结果或图表。",
+  "New Dashboard...": "新建仪表盘…",
+  "Add to which dashboard?": "加入到哪个仪表盘？",
+  "Dashboard name": "仪表盘名称",
+  "Dashboard": "仪表盘",
+  "Added to dashboard \"{0}\".": "已添加到仪表盘“{0}”。",
+  "Not connected": "未连接",
+  "Query": "查询"
 }

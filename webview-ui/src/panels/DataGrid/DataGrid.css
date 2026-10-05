@@ -982,3 +982,20 @@ tr:hover .row-actions, tr.selected .row-actions { opacity: 1; }
 .sort-action-btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
 .column-header-th.sorted-asc .sort-action-btn, .column-header-th.sorted-desc .sort-action-btn { opacity: 1; color: var(--vscode-foreground); }
 .sort-order { font-size: 8px; position: absolute; top: -2px; right: -3px; color: var(--vscode-focusBorder, #007acc); }
+
+/* Badge shown on a read-only grid whose data came from an AI assistant. */
+.ai-result-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--vscode-badge-foreground, #ffffff);
+  background: var(--vscode-badge-background, #4d4d4d);
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

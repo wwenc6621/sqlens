@@ -1,0 +1,183 @@
+.chart-view {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  box-sizing: border-box;
+}
+
+.chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  flex-wrap: wrap;
+}
+
+.chart-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.chart-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Segmented chart-type control */
+.chart-seg {
+  display: inline-flex;
+  border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.chart-seg-btn {
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: none;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+.chart-seg-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+}
+
+.chart-seg-btn.active {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.chart-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.chart-field-label {
+  color: var(--vscode-descriptionForeground);
+}
+
+.chart-select {
+  background: var(--vscode-dropdown-background, var(--vscode-editor-background));
+  color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.35)));
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  max-width: 220px;
+}
+
+/* Measure (values) multi-select */
+.chart-values {
+  position: relative;
+}
+
+.chart-values-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  background: var(--vscode-dropdown-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chart-values-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.chart-values-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-values-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 180px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.35)));
+  border-radius: 4px;
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+  padding: 4px;
+}
+
+.chart-values-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  font-size: 12px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.chart-values-item:hover {
+  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));
+}
+
+.chart-note {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.chart-canvas {
+  flex: 1 1 auto;
+  min-height: 240px;
+  width: 100%;
+}
+
+/* Toolbar icon button (self-contained; DataGrid's styles are not guaranteed here) */
+.chart-view .toolbar-btn.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.chart-view .toolbar-btn.icon-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+}
+
+.chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--vscode-descriptionForeground);
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+}

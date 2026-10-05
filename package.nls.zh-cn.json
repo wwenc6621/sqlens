@@ -129,5 +129,7 @@
   "Additional Redis commands to block from execution (danger commands are always blocked)": "额外禁止执行的 Redis 命令（危险命令始终被拦截）",
   "Redis: Export to JSON": "Redis：导出为 JSON",
   "Redis: Import from JSON": "Redis：从 JSON 导入",
-  "Open MCP Server Panel": "打开 MCP 服务器面板"
+  "Open MCP Server Panel": "打开 MCP 服务器面板",
+  "Open Dashboard": "打开仪表盘",
+  "Add to Dashboard...": "添加到仪表盘…"
 }

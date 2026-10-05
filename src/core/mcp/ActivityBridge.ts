@@ -15,6 +15,8 @@ export interface AiActivityEntry {
   success: boolean;
   error?: string;
   blocked?: boolean;
+  /** Id of the panel tab showing this call's result (set for read queries). */
+  tabId?: string;
 }
 
 /** A write statement waiting for the user to allow/deny it in the AI Activity panel. */
@@ -97,7 +99,14 @@ export class ActivityBridge {
     client: string,
     argsSummary: string,
     fn: () => Promise<T>,
-    extra?: { sql?: string; connectionName?: string; rowCountFrom?: (r: T) => number | undefined; blocked?: boolean },
+    extra?: {
+      sql?: string;
+      connectionName?: string;
+      rowCountFrom?: (r: T) => number | undefined;
+      blocked?: boolean;
+      /** Called after a successful call, before the entry is persisted. */
+      afterSuccess?: (entry: AiActivityEntry, result: T) => void;
+    },
   ): Promise<T> {
     const entry: AiActivityEntry = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -122,6 +131,8 @@ export class ActivityBridge {
       entry.durationMs = Math.round(performance.now() - start);
       entry.success = true;
       entry.rowCount = extra?.rowCountFrom?.(result);
+      // Let callers attach extra info (e.g. the result tab id) before persisting.
+      try { extra?.afterSuccess?.(entry, result); } catch { /* never break the call */ }
       this.channel.appendLine(`[AI]   -> ok in ${entry.durationMs}ms${entry.rowCount != null ? `, ${entry.rowCount} rows` : ''}`);
       return result;
     } catch (err) {

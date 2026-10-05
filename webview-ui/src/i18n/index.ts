@@ -477,6 +477,28 @@ const zh: Record<string, string> = {
   'connection imported': '个连接已导入',
   'connections imported': '个连接已导入',
   'Import more': '继续导入',
+  // Chart panel
+  'Visualize': '可视化',
+  'Chart': '图表',
+  'Bar': '柱状图',
+  'Line': '折线图',
+  'Pie': '饼图',
+  'Dimension': '维度',
+  'Values': '数值',
+  '(row index)': '（行号）',
+  'Preparing chart': '正在准备图表',
+  'No numeric column to visualize': '没有可用于图表的数值列',
+  'Showing first {0} rows': '仅展示前 {0} 行',
+  // AI result grid
+  'Open in grid': '在表格中打开',
+  'Read-only AI query result': 'AI 查询结果（只读）',
+  // Saved query / dashboard
+  'Save as query': '保存为查询',
+  'Add to Dashboard': '添加到仪表盘',
+  'Dashboard': '仪表盘',
+  'No widgets yet': '还没有卡片',
+  'Run a query, then use "Add to Dashboard" to add a card here.': '运行一个查询后，用「添加到仪表盘」在这里添加卡片。',
+  'Remove': '移除',
 
 };
 

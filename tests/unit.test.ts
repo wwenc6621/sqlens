@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { getClassifier, isSqlFamily } from '../src/core/mcp/StatementClassifiers';
@@ -15,6 +16,9 @@ import { normalizeSqlType } from '../src/core/drivers/MSSQLDriver';
 import { parseMongoCall } from '../src/core/drivers/MongoDBDriver';
 import { SecurityGuard } from '../src/core/mcp/SecurityGuard';
 import { matchTableFilter } from '../webview-ui/src/panels/Schema/schemaTableFilter';
+import { suggestChart, buildChartData, CHART_MAX_ROWS } from '../webview-ui/src/utils/chartSuggest';
+import { AiResultBridge } from '../src/core/mcp/AiResultBridge';
+import { DashboardStore } from '../src/core/analytics/DashboardStore';
 import { NormalizedColumnType } from '../src/core/types';
 
 const ROOT = path.resolve(__dirname, '..');
@@ -251,4 +255,119 @@ test('guard: DDL passes only with auto-approve, destructive statements never do'
 
   // Multiple statements stay refused for the SQL family.
   assert.equal(guard.validate('SELECT 1; SELECT 2', auto).ok, false);
+});
+
+// ── Chart suggestion ────────────────────────────────────────────────────────
+
+test('chart suggestion picks a dimension and measures', () => {
+  const cols = [
+    { name: 'province', normalizedType: 'string' },
+    { name: 'orders', normalizedType: 'integer' },
+    { name: 'amount', normalizedType: 'decimal' },
+  ];
+  const rows = [['BJ', 3, 12.5], ['SH', 5, 20]];
+  assert.deepEqual(suggestChart(cols, rows), {
+    kind: 'bar',
+    x: 'province',
+    y: ['orders', 'amount'],
+  });
+});
+
+test('chart suggestion prefers a temporal axis and needs a numeric column', () => {
+  const dated = suggestChart(
+    [{ name: 'day', normalizedType: 'date' }, { name: 'n', normalizedType: 'integer' }],
+    [['2026-01-01', 1]],
+  );
+  assert.equal(dated?.kind, 'line');
+  assert.equal(dated?.x, 'day');
+
+  assert.equal(suggestChart([{ name: 'name', normalizedType: 'string' }], [['a']]), null);
+  assert.equal(suggestChart([], []), null);
+});
+
+test('chart data shaping coerces values, uses index axis and caps rows', () => {
+  const cols = [
+    { name: 'k', normalizedType: 'string' },
+    { name: 'v', normalizedType: 'float' },
+  ];
+  const rows: unknown[][] = [['a', '1.5'], ['b', null], ['c', 'oops']];
+  const data = buildChartData(cols, rows, { kind: 'bar', x: 'k', y: ['v'] });
+  assert.deepEqual(data.categories, ['a', 'b', 'c']);
+  assert.deepEqual(data.series[0].data, [1.5, null, null]);
+  assert.equal(data.series[0].name, 'v');
+  assert.equal(data.renderedRows, 3);
+
+  // No dimension selected -> the row index becomes the category label.
+  const byIndex = buildChartData(cols, rows, { kind: 'bar', y: ['v'] });
+  assert.deepEqual(byIndex.categories, ['1', '2', '3']);
+
+  // Rows beyond the cap are dropped, but the total is reported.
+  const many = Array.from({ length: CHART_MAX_ROWS + 25 }, (_, i) => ['x', i]);
+  const capped = buildChartData(cols, many, { kind: 'bar', x: 'k', y: ['v'] });
+  assert.equal(capped.renderedRows, CHART_MAX_ROWS);
+  assert.equal(capped.totalRows, CHART_MAX_ROWS + 25);
+});
+
+// ── AI result bridge ────────────────────────────────────────────────────────
+
+test('ai result bridge merges equal queries, maps activities and evicts LRU', () => {
+  const opened: string[] = [];
+  const bridge = new AiResultBridge(record => { opened.push(record.tabId); }, 2);
+  const base = {
+    clientName: 'CodeBuddy',
+    connectionId: 'c1',
+    connectionName: 'db',
+    columns: [],
+    rows: [] as unknown[][],
+    totalRows: 0,
+    truncated: false,
+    executionTime: 1,
+  };
+
+  const t1 = bridge.present({ ...base, activityId: 'a1', sql: 'SELECT 1' });
+  // Same statement up to whitespace / trailing semicolon -> same tab.
+  const t2 = bridge.present({ ...base, activityId: 'a2', sql: 'SELECT   1 ;' });
+  assert.equal(t1, t2);
+  assert.equal(bridge.getByActivity('a1')?.tabId, t1);
+  assert.equal(bridge.getByActivity('a2')?.tabId, t1);
+  assert.equal(opened.length, 2);
+
+  // A different statement opens a different tab.
+  const t3 = bridge.present({ ...base, activityId: 'a3', sql: 'SELECT 2' });
+  assert.notEqual(t3, t1);
+
+  // maxEntries = 2: presenting a third distinct tab evicts the oldest.
+  const t4 = bridge.present({ ...base, activityId: 'a4', sql: 'SELECT 3' });
+  assert.equal(bridge.getByTab(t1), undefined);
+  assert.equal(bridge.getByTab(t4)?.payload.sql, 'SELECT 3');
+});
+
+// ── Dashboard store ─────────────────────────────────────────────────────────
+
+test('dashboard store persists dashboards and widgets across reloads', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sqlens-dash-'));
+  try {
+    const store = new DashboardStore(dir);
+    assert.deepEqual(store.list(), []);
+
+    const dash = store.create('Sales');
+    assert.equal(store.list().length, 1);
+
+    store.addWidget(dash.id, { title: 'Orders', connectionId: 'c1', sql: 'SELECT 1', kind: 'table' });
+    const withWidget = store.get(dash.id)!;
+    assert.equal(withWidget.widgets.length, 1);
+    assert.equal(withWidget.widgets[0].title, 'Orders');
+
+    // A fresh instance reads the same file -> persistence works.
+    const reloaded = new DashboardStore(dir).get(dash.id)!;
+    assert.equal(reloaded.widgets.length, 1);
+
+    store.removeWidget(dash.id, reloaded.widgets[0].id);
+    assert.equal(new DashboardStore(dir).get(dash.id)!.widgets.length, 0);
+
+    store.rename(dash.id, 'Sales 2026');
+    assert.equal(new DashboardStore(dir).get(dash.id)!.name, 'Sales 2026');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

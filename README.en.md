@@ -27,6 +27,10 @@ It works in VS Code and VS Code forks such as Trae, and the UI follows your edit
 - Export/import table data, ER diagrams, and query execution plans.
 - Project-level connections in `.sqlens.json`, SSH tunneling, `.env` auto-detection.
 - Connections are shared across all VS Code forks on the machine (optional).
+- **Query result visualization**: turn any result grid into a bar / line / pie chart in one click, and export it as PNG.
+- **AI query results in the grid**: read queries an AI runs over MCP appear as a read-only grid in the results panel, with one-click jump-back from AI Activity; identical SQL reuses the same tab.
+- **Table/column comments for AI**: the AI can read table and column comments (and search by them) through MCP, so it writes accurate SQL.
+- **Save as query / Dashboards**: save any result as a query, or pin queries and charts onto a dashboard card grid (manual refresh, persisted).
 - Localized UI: English and Simplified Chinese, following the editor language.
 
 ## Supported Databases

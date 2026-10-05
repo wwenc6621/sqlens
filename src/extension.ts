@@ -40,6 +40,9 @@ import { DatabaseDumpService } from './core/utils/DatabaseDumpService';
 import { ImportExportService } from './core/utils/ImportExportService';
 import { McpService } from './core/mcp/McpService';
 import { ActivityBridge } from './core/mcp/ActivityBridge';
+import { AiResultBridge } from './core/mcp/AiResultBridge';
+import type { AiResultRecord } from './core/mcp/AiResultBridge';
+import { DashboardStore } from './core/analytics/DashboardStore';
 import { AssistantRegistrar } from './core/mcp/AssistantRegistrar';
 import { initI18n, t } from './core/i18n';
 
@@ -61,6 +64,20 @@ let sqlCodeLensProvider: SQLCodeLensProvider | undefined;
 let mcpService: McpService | undefined;
 let mcpActivity: ActivityBridge | undefined;
 let mcpRegistrar: AssistantRegistrar | undefined;
+/** Maps AI query results to panel tabs so they can be shown / reopened. */
+let aiResultBridge: AiResultBridge | undefined;
+/** Global (cross-project) dashboard storage. */
+let dashboardStore: DashboardStore | undefined;
+/** Panel tab currently on screen (used by commands that act on the active tab). */
+let activePanelTabId: string | null = null;
+/** Dashboard shown by the dashboard tab (defaults to the first one). */
+let currentDashboardId: string | undefined;
+/** When an AI result tab was last presented (used to keep AI Activity from stealing focus). */
+let lastAiResultTabAt = 0;
+/** Source info for each chart tab, so it can be saved / added to a dashboard. */
+const chartTabMeta = new Map<string, { connectionId?: string; sql?: string; tableName?: string }>();
+/** Latest chart config reported by each chart tab. */
+const chartTabConfig = new Map<string, unknown>();
 
 /**
  * Per-tab message handlers for everything hosted in the Sqlens panel view
@@ -407,6 +424,35 @@ export function activate(context: vscode.ExtensionContext) {
     // used by the MCP title-bar button to toggle the MCP panel.
     if ((message as any).type === 'panelActiveTabChanged') {
       mcpTabActive = instanceId === MCP_TAB_ID;
+      activePanelTabId = instanceId ?? null;
+      return;
+    }
+
+    // ── Save-as-query / add-to-dashboard from a grid or chart tab ──
+    if ((message as any).type === 'chartState' && instanceId) {
+      chartTabConfig.set(instanceId, (message as any).data?.config);
+      return;
+    }
+    if ((message as any).type === 'saveGridQuery' && instanceId) {
+      void saveQueryForTab(instanceId);
+      return;
+    }
+    if ((message as any).type === 'addToDashboard' && instanceId) {
+      void addToDashboardFromTab(instanceId);
+      return;
+    }
+
+    // Visualize the current result of a data-grid tab in a new chart tab.
+    if ((message as any).type === 'visualizeResult' && instanceId) {
+      openChartTabForGrid(instanceId);
+      return;
+    }
+
+    // "Open in grid" jump from the AI Activity panel.
+    if ((message as any).type === 'openAiResultTab') {
+      const activityId = (message as any).activityId as string | undefined;
+      const record = activityId ? aiResultBridge?.getByActivity(activityId) : undefined;
+      if (record) { presentAiResultTab(record); }
       return;
     }
 
@@ -498,6 +544,258 @@ export function activate(context: vscode.ExtensionContext) {
     queryResultsViewProvider.removeTab(instanceId);
     // Never reveal the panel just to close a tab.
     queryResultsViewProvider.postSilently({ type: 'closePanelTab', instanceId } as any);
+  }
+
+  /**
+   * Open a chart tab that visualizes the current result of a data-grid tab.
+   * The grid's latest result is read from the view provider's per-tab cache, so
+   * the chart matches what the user is looking at (including pagination).
+   */
+  function openChartTabForGrid(gridInstanceId: string) {
+    const cached = queryResultsViewProvider.getTabMessage(gridInstanceId) as any;
+    const data = cached?.data;
+    const columns = data?.columns as unknown[] | undefined;
+    const rows = data?.rows as unknown[][] | undefined;
+    if (!columns || !Array.isArray(rows) || rows.length === 0) {
+      void vscode.window.showInformationMessage(t('Nothing to visualize here.'));
+      return;
+    }
+
+    // One chart tab per source tab: clicking again refreshes the existing chart
+    // instead of piling up a new tab every time.
+    const chartId = `chart-${gridInstanceId}`;
+    const title = cached?.tableName ? `${t('Chart')} · ${cached.tableName}` : t('Chart');
+    const payload = {
+      columns,
+      rows,
+      tableName: cached?.tableName,
+      querySql: cached?.querySql,
+    };
+    // Remember where this chart came from so it can be saved / added to a dashboard.
+    chartTabMeta.set(chartId, {
+      connectionId: panelTabConnections.get(gridInstanceId),
+      sql: cached?.querySql,
+      tableName: cached?.tableName,
+    });
+
+    openPanelTab({
+      instanceId: chartId,
+      kind: 'chart',
+      title,
+      // Re-send the payload on every open so a repeated click refreshes in place.
+      remount: true,
+      handler: (message: WebviewMessage) => {
+        if (message.type === 'ready') {
+          if (!panelTabHandlers.has(chartId)) { return; }
+          queryResultsViewProvider.postMessage({
+            type: 'chartData',
+            instanceId: chartId,
+            tabKind: 'chart',
+            tabTitle: title,
+            data: payload,
+          } as any);
+          return;
+        }
+        if (message.type === 'saveImage') {
+          void saveDiagramImage(message.data.base64, message.data.fileName);
+        }
+      },
+    });
+  }
+
+  /**
+   * Show an AI query result in a normal (read-only) data-grid tab. Reused both
+   * when the AI runs a query and when the user jumps back from AI Activity.
+   */
+  function presentAiResultTab(record: AiResultRecord) {
+    const { tabId, payload } = record;
+    lastAiResultTabAt = Date.now();
+    const title = payload.connectionName
+      ? `AI · ${payload.clientName} · ${payload.connectionName}`
+      : `AI · ${payload.clientName}`;
+
+    openPanelTab({
+      instanceId: tabId,
+      kind: 'dataGrid',
+      title,
+      remount: true,
+      handler: (message: WebviewMessage) => {
+        if (message.type === 'ready') {
+          if (!panelTabHandlers.has(tabId)) { return; }
+          queryResultsViewProvider.postMessage({
+            type: 'queryResult',
+            instanceId: tabId,
+            tabKind: 'dataGrid',
+            tabTitle: title,
+            source: 'ai',
+            aiClient: payload.clientName,
+            querySql: payload.sql,
+            data: {
+              columns: payload.columns,
+              rows: payload.rows,
+              affectedRows: 0,
+              executionTime: payload.executionTime,
+              truncated: payload.truncated,
+              messages: [],
+            },
+          } as any);
+          return;
+        }
+        // Read-only snapshot: editing / paging messages are intentionally ignored.
+      },
+    });
+  }
+
+  // ── Dashboards (saved queries rendered as cards) ──
+
+  /** Resolve the SQL / connection behind a grid or chart tab. */
+  function resolveTabSource(instanceId: string): {
+    sql?: string;
+    connectionId?: string;
+    tableName?: string;
+    chartConfig?: { kind?: string; x?: string; y?: string[] };
+  } {
+    const chartMeta = chartTabMeta.get(instanceId);
+    if (chartMeta) {
+      return {
+        sql: chartMeta.sql,
+        connectionId: chartMeta.connectionId,
+        tableName: chartMeta.tableName,
+        chartConfig: chartTabConfig.get(instanceId) as { kind?: string; x?: string; y?: string[] } | undefined,
+      };
+    }
+    const cached = queryResultsViewProvider.getTabMessage(instanceId) as any;
+    const aiRecord = aiResultBridge?.getByTab(instanceId);
+    return {
+      sql: cached?.querySql,
+      connectionId: panelTabConnections.get(instanceId) ?? aiRecord?.payload.connectionId,
+      tableName: cached?.tableName,
+    };
+  }
+
+  /** Turn a query's first words into a reasonable default saved-query name. */
+  function defaultQueryName(sql: string): string {
+    const words = sql.trim().replace(/\s+/g, ' ').split(' ').slice(0, 3).join(' ');
+    return (words.length > 40 ? words.slice(0, 40) : words) || 'query';
+  }
+
+  /** Save the query behind a tab as a shared saved query. */
+  async function saveQueryForTab(instanceId: string) {
+    const { sql, connectionId } = resolveTabSource(instanceId);
+    if (!sql) {
+      void vscode.window.showWarningMessage(t('This tab has no query to save.'));
+      return;
+    }
+    if (!connectionId) {
+      void vscode.window.showWarningMessage(t('This result is not tied to a connection.'));
+      return;
+    }
+    const config = (await connectionManager.getSavedConnections()).find(c => c.id === connectionId);
+    if (!config) { return; }
+
+    const taken = await savedQueryTreeProvider.existingNames(connectionId);
+    const name = await promptQueryName({ title: t('Save as query'), value: defaultQueryName(sql), taken });
+    if (!name) { return; }
+
+    const uri = await savedQueryTreeProvider.createQuery(connectionId, name, config.name || 'Connection', sql);
+    await bindSavedQueryContext(await vscode.workspace.openTextDocument(uri));
+    await vscode.window.showTextDocument(uri);
+    savedQueryTreeProvider.refresh();
+  }
+
+  function currentDashboard() {
+    if (!dashboardStore) { return undefined; }
+    return (currentDashboardId ? dashboardStore.get(currentDashboardId) : undefined) ?? dashboardStore.list()[0];
+  }
+
+  /** Add the active tab (grid result or chart) to a dashboard as a card. */
+  async function addToDashboardFromTab(instanceId: string) {
+    if (!dashboardStore) { return; }
+    const { sql, connectionId, tableName, chartConfig } = resolveTabSource(instanceId);
+    if (!sql || !connectionId) {
+      void vscode.window.showWarningMessage(t('Nothing to add to a dashboard from this tab.'));
+      return;
+    }
+
+    const dashboards = dashboardStore.list();
+    const picks: vscode.QuickPickItem[] = [
+      ...dashboards.map(d => ({ label: d.name, description: `${d.widgets.length}`, id: d.id } as vscode.QuickPickItem)),
+      { label: t('New Dashboard...'), id: '__new__' } as vscode.QuickPickItem,
+    ];
+    const pick = await vscode.window.showQuickPick(picks, { placeHolder: t('Add to which dashboard?') });
+    if (!pick) { return; }
+
+    let dashboard = dashboards.find(d => d.id === (pick as unknown as { id: string }).id);
+    if (!dashboard) {
+      const name = await vscode.window.showInputBox({ prompt: t('Dashboard name'), value: t('Dashboard') });
+      if (!name) { return; }
+      dashboard = dashboardStore.create(name);
+    }
+
+    dashboardStore.addWidget(dashboard.id, {
+      title: tableName || (chartConfig ? t('Chart') : t('Query')),
+      connectionId,
+      sql,
+      kind: chartConfig ? (chartConfig.kind as 'bar' | 'line' | 'pie') : 'table',
+      x: chartConfig?.x,
+      y: chartConfig?.y,
+    });
+    currentDashboardId = dashboard.id;
+    await refreshDashboard();
+    openDashboardTab(true);
+    void vscode.window.showInformationMessage(t('Added to dashboard "{0}".', dashboard.name));
+  }
+
+  /** Open the dashboard tab (creating the first dashboard on demand). */
+  function openDashboardTab(activate: boolean) {
+    openPanelTab({
+      instanceId: DASHBOARD_TAB_ID,
+      kind: 'dashboard',
+      title: t('Dashboard'),
+      activate,
+      remount: true,
+      handler: (message: WebviewMessage) => {
+        const type = (message as any).type;
+        if (type === 'ready' || type === 'dashboardRefresh') { void refreshDashboard(); return; }
+        if (type === 'dashboardRemoveWidget') {
+          const dash = currentDashboard();
+          if (dash) { dashboardStore?.removeWidget(dash.id, (message as any).widgetId); }
+          void refreshDashboard();
+          return;
+        }
+      },
+    });
+  }
+
+  /** Run every widget query and push the fresh results to the dashboard tab. */
+  async function refreshDashboard() {
+    if (!dashboardStore) { return; }
+    let dash = currentDashboard();
+    if (!dash) { dash = dashboardStore.create(t('Dashboard')); currentDashboardId = dash.id; }
+
+    const results: Record<string, { columns: unknown[]; rows: unknown[][]; error?: string }> = {};
+    for (const widget of dash.widgets) {
+      const driver = connectionManager.getDriver(widget.connectionId);
+      if (!driver || !driver.isConnected) {
+        results[widget.id] = { columns: [], rows: [], error: t('Not connected') };
+        continue;
+      }
+      try {
+        const res = await driver.query(widget.sql);
+        results[widget.id] = { columns: res.columns as unknown[], rows: res.rows as unknown[][] };
+      } catch (err) {
+        results[widget.id] = { columns: [], rows: [], error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+
+    if (!panelTabHandlers.has(DASHBOARD_TAB_ID)) { return; }
+    queryResultsViewProvider.postMessage({
+      type: 'dashboardData',
+      instanceId: DASHBOARD_TAB_ID,
+      tabKind: 'dashboard',
+      tabTitle: t('Dashboard'),
+      data: { dashboard: currentDashboard() ?? null, results },
+    } as any);
   }
 
   /** Close every panel tab owned by a connection. */
@@ -661,13 +959,17 @@ export function activate(context: vscode.ExtensionContext) {
 
   const AI_ACTIVITY_TAB_ID = 'ai-activity';
   const MCP_TAB_ID = 'mcp-server';
+  const DASHBOARD_TAB_ID = 'dashboard';
 
+  dashboardStore = new DashboardStore(context.globalStorageUri.fsPath);
+
+  aiResultBridge = new AiResultBridge((record) => presentAiResultTab(record));
   mcpActivity = new ActivityBridge(context);
   mcpService = new McpService(connectionManager, queryHistory, mcpActivity, (table) => {
     // Action follow: briefly highlight the table the AI touched in the Schema view.
     if (!connectionManager.activeConnectionId) { return; }
     void schemaWebviewViewProvider?.revealTable(table).catch(() => {});
-  });
+  }, (payload) => aiResultBridge?.present(payload));
   mcpRegistrar = new AssistantRegistrar(
     () => mcpService?.endpoint || '',
     () => (mcpService && extensionContext ? mcpService.getAuthToken(extensionContext) : ''),
@@ -879,8 +1181,15 @@ export function activate(context: vscode.ExtensionContext) {
       if (!hasTab) {
         const autoOpen = cfg.get<boolean>('autoOpenActivity', true);
         if ((entries.length > 0 || pending.length > 0) && autoOpen) {
-          // First AI activity in this window: open the panel so the user sees it.
-          postAiActivityData(true);
+          // First AI activity in this window: reveal the panel so the user sees it.
+          // A read query already opened (and activated) a result tab, which is the
+          // more useful view — so create the AI Activity tab without stealing focus.
+          if (Date.now() - lastAiResultTabAt < 2000) {
+            void vscode.commands.executeCommand('sqlens.queryResultsView.focus');
+            pushAiActivitySilently();
+          } else {
+            postAiActivityData(true);
+          }
         }
         return;
       }
@@ -941,6 +1250,22 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('sqlens.mcp.clearActivity', () => mcpActivity?.clear()),
     { dispose: () => void mcpService?.dispose() },
     mcpActivity,
+  );
+
+  // ── Dashboard commands ──
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sqlens.openDashboard', () => {
+      const dash = currentDashboard();
+      if (dash) { currentDashboardId = dash.id; }
+      openDashboardTab(true);
+    }),
+    vscode.commands.registerCommand('sqlens.addToDashboard', async () => {
+      if (!activePanelTabId) {
+        void vscode.window.showWarningMessage(t('Open a query result or chart first.'));
+        return;
+      }
+      await addToDashboardFromTab(activePanelTabId);
+    }),
   );
 
   // ── Logging Commands ──

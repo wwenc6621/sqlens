@@ -185,7 +185,7 @@ export class SavedQueryTreeProvider implements vscode.TreeDataProvider<TreeItem>
   }
 
   /** Create `<name>.sql`, appending a counter if that name is taken. */
-  async createQuery(connectionId: string, name: string, connectionName: string): Promise<vscode.Uri> {
+  async createQuery(connectionId: string, name: string, connectionName: string, sql?: string): Promise<vscode.Uri> {
     const dir = connectionQueriesDir(this.context, connectionId);
     await vscode.workspace.fs.createDirectory(dir);
 
@@ -196,7 +196,8 @@ export class SavedQueryTreeProvider implements vscode.TreeDataProvider<TreeItem>
     }
 
     const header = `-- ${stem}\n-- Connection: ${connectionName}\n\n`;
-    await vscode.workspace.fs.writeFile(uri, Buffer.from(header, 'utf8'));
+    const body = sql ? `${header}${sql.trimEnd()}\n` : header;
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(body, 'utf8'));
     this.refresh();
     return uri;
   }

@@ -2,6 +2,7 @@
  * Core type definitions for Sqlens VSCode Extension.
  * Defines all shared interfaces, types, and enums used across the extension.
  */
+import type { Dashboard } from './analytics/DashboardStore';
 
 export enum DatabaseType {
   MySQL = 'mysql',
@@ -235,7 +236,7 @@ export interface RowChange {
 
 /** Messages between extension and webview */
 export type ExtensionMessage =
-  | { type: 'queryResult'; data: QueryResult; tableName?: string; schemaName?: string }
+  | { type: 'queryResult'; data: QueryResult; tableName?: string; schemaName?: string; source?: 'ai'; aiClient?: string }
   | { type: 'connectionStatus'; data: { id: string; connected: boolean } }
   | { type: 'schemaUpdate'; data: { tables: TableInfo[] } }
   | { type: 'error'; data: { message: string; code?: string } }
@@ -260,7 +261,9 @@ export type ExtensionMessage =
   | { type: 'importWizardParseResult'; data: { format: string; error?: string; items: Array<{ index: number; name: string; type: string; host?: string; port?: number; username?: string; hasPassword: boolean; database?: string; filepath?: string; group?: string; issues: string[] }> } }
   | { type: 'importWizardText'; data: { text: string } }
   | { type: 'importWizardDone'; data: { imported: number } }
-  | { type: 'importWizardGroups'; data: { groups: string[] } };
+  | { type: 'importWizardGroups'; data: { groups: string[] } }
+  | { type: 'chartData'; data: { columns: ColumnHeader[]; rows: unknown[][]; tableName?: string; querySql?: string } }
+  | { type: 'dashboardData'; data: { dashboard: Dashboard | null; results: Record<string, { columns: ColumnHeader[]; rows: unknown[][]; error?: string }> } };
 
 export type WebviewMessage =
   | { type: 'executeQuery'; data: { sql: string; connectionId: string } }
@@ -284,6 +287,13 @@ export type WebviewMessage =
   | { type: 'executeCreateTable'; data: { sql: string; tableName: string; schemaName?: string } }
   | { type: 'saveImage'; data: { base64: string; fileName: string } }
   | { type: 'exportQueryResults'; data: { format: 'csv' | 'json' | 'sql'; columns: string[]; rows: unknown[][]; tableName?: string } }
+  | { type: 'visualizeResult' }
+  | { type: 'openAiResultTab'; activityId: string }
+  | { type: 'saveGridQuery' }
+  | { type: 'addToDashboard' }
+  | { type: 'dashboardRefresh' }
+  | { type: 'dashboardRemoveWidget'; widgetId: string }
+  | { type: 'chartState'; data: { config: unknown } }
   | { type: 'importWizardParse'; data: { text: string } }
   | { type: 'importWizardCommit'; data: { text: string; picks: Array<{ index: number; name?: string; group?: string }> } }
   | { type: 'importWizardReadClipboard' }

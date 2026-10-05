@@ -329,6 +329,8 @@ export default function DataGrid({ instanceId = 'default' }: { instanceId?: stri
   const post = useCallback((message: any) => postRaw({ ...message, instanceId }), [instanceId]);
 
   const [result, setResult] = useState<QueryResult | null>(null);
+  /** Set when this grid shows a read-only AI query result (assistant name). */
+  const [aiClient, setAiClient] = useState<string>('');
   const [awaitingInitialResult, setAwaitingInitialResult] = useState(true);
   const [rows, setRows] = useState<RowState[]>([]);
   const [sortStates, setSortStates] = useState<SortState[]>([]);
@@ -445,6 +447,7 @@ export default function DataGrid({ instanceId = 'default' }: { instanceId?: stri
       if (msg.type === 'queryResult') {
         setAwaitingInitialResult(false);
         const r = msg.data as QueryResult;
+        setAiClient(typeof msg.aiClient === 'string' ? msg.aiClient : '');
         setResult(r);
         if (r.columns.length > 0) {
           const persistedLayout = readPersistedGridState().columnLayout;
@@ -744,12 +747,13 @@ export default function DataGrid({ instanceId = 'default' }: { instanceId?: stri
 
   // ── Cell Editing ──
   const startEdit = useCallback((visIdx: number, colIdx: number) => {
+    if (aiClient) return; // AI results are a read-only snapshot
     const item = pageRows[visIdx];
     if (!item || !result) return;
     const val = item.row.data[colIdx];
     setEditingCell({ row: visIdx, col: colIdx });
     setEditValue(val === null ? '' : String(val));
-  }, [pageRows, result]);
+  }, [pageRows, result, aiClient]);
 
   const commitEdit = useCallback(() => {
     if (!editingCell || !result) return;
@@ -2002,6 +2006,11 @@ export default function DataGrid({ instanceId = 'default' }: { instanceId?: stri
           <span className="row-count">
             {rowFilterApplying ? t('Searching within the current page...') : `${visibleRowsCount.toLocaleString()} rows`}
           </span>
+          {aiClient && (
+            <span className="ai-result-badge" title={t('Read-only AI query result')}>
+              <Icon name="zap" size={11} /> AI · {aiClient}
+            </span>
+          )}
         </div>
         <div className="toolbar-right">
           {hasChanges && (
@@ -2025,7 +2034,27 @@ export default function DataGrid({ instanceId = 'default' }: { instanceId?: stri
               title={verticalView ? 'Exit Vertical View' : 'Vertical View (records as columns)'}
             ><Icon name="columns" /></button>
           )}
-          <button className="toolbar-btn icon-btn" onClick={addRow} title={t('Add Row')}><Icon name="plus" /></button>
+          {!aiClient && (
+            <button className="toolbar-btn icon-btn" onClick={addRow} title={t('Add Row')}><Icon name="plus" /></button>
+          )}
+          <button
+            className="toolbar-btn icon-btn"
+            onClick={() => post({ type: 'saveGridQuery' })}
+            disabled={!result}
+            title={t('Save as query')}
+          ><Icon name="save" /></button>
+          <button
+            className="toolbar-btn icon-btn"
+            onClick={() => post({ type: 'addToDashboard' })}
+            disabled={!result}
+            title={t('Add to Dashboard')}
+          ><Icon name="share" /></button>
+          <button
+            className="toolbar-btn icon-btn"
+            onClick={() => post({ type: 'visualizeResult' })}
+            disabled={!result || result.rows.length === 0}
+            title={t('Visualize')}
+          ><Icon name="chart" /></button>
           <div className="csv-copy-group" ref={csvMenuRef}>
             <button className="toolbar-btn icon-btn" onClick={() => setCsvMenuOpen(v => !v)} title={t('Copy / Export data')}><Icon name="download" /></button>
             {csvMenuOpen && (
@@ -2043,8 +2072,10 @@ export default function DataGrid({ instanceId = 'default' }: { instanceId?: stri
               </div>
             )}
           </div>
-          <button className="toolbar-btn icon-btn" onClick={undo} disabled={undoStack.length === 0} title={t('Undo (Ctrl+Z)')}><Icon name="undo" /></button>
-          <button className="toolbar-btn icon-btn" onClick={redo} disabled={redoStack.length === 0} title={t('Redo (Ctrl+Shift+Z)')}><Icon name="redo" /></button>
+          {!aiClient && <>
+            <button className="toolbar-btn icon-btn" onClick={undo} disabled={undoStack.length === 0} title={t('Undo (Ctrl+Z)')}><Icon name="undo" /></button>
+            <button className="toolbar-btn icon-btn" onClick={redo} disabled={redoStack.length === 0} title={t('Redo (Ctrl+Shift+Z)')}><Icon name="redo" /></button>
+          </>}
           {hasChanges && <>
             <button className="toolbar-btn icon-btn btn-preview sql-preview-btn" onClick={handlePreviewSQL} title={t('Preview SQL')}><Icon name="terminal" /></button>
             <button className="toolbar-btn icon-btn btn-discard" onClick={handleDiscard} title={t('Discard Changes')}><Icon name="close" /></button>

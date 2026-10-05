@@ -10,11 +10,13 @@ import QueryPlanView from '../panels/QueryPlan/QueryPlanView';
 import LogDetailView from '../panels/LogDetail/LogDetailView';
 import AiActivityView from '../panels/AiActivity/AiActivityView';
 import McpServerView from '../panels/McpServer/McpServerView';
+import ChartView from '../panels/Chart/ChartView';
+import DashboardView from '../panels/Dashboard/DashboardView';
 import Icon from './Icon';
 import type { IconName } from './Icon';
 import './PanelHost.css';
 
-export type PanelKind = 'dataGrid' | 'structureView' | 'createTable' | 'erDiagram' | 'quickView' | 'queryPlan' | 'logDetail' | 'aiActivity' | 'mcp';
+export type PanelKind = 'dataGrid' | 'structureView' | 'createTable' | 'erDiagram' | 'quickView' | 'queryPlan' | 'logDetail' | 'aiActivity' | 'mcp' | 'chart' | 'dashboard';
 
 export interface PanelTabInfo {
   id: string;
@@ -36,6 +38,8 @@ const KIND_META: Record<PanelKind, { icon: IconName }> = {
   logDetail: { icon: 'terminal' },
   aiActivity: { icon: 'zap' },
   mcp: { icon: 'plug' },
+  chart: { icon: 'chart' },
+  dashboard: { icon: 'chart' },
 };
 
 function normalizeKind(kind: unknown): PanelKind {
@@ -48,6 +52,8 @@ function normalizeKind(kind: unknown): PanelKind {
     case 'logDetail':
     case 'aiActivity':
     case 'mcp':
+    case 'chart':
+    case 'dashboard':
       return kind;
     default:
       return 'dataGrid';
@@ -64,6 +70,8 @@ function renderPanel(tab: PanelTabInfo) {
     case 'logDetail': return <LogDetailView instanceId={tab.id} />;
     case 'aiActivity': return <AiActivityView instanceId={tab.id} />;
     case 'mcp': return <McpServerView instanceId={tab.id} />;
+    case 'chart': return <ChartView instanceId={tab.id} />;
+    case 'dashboard': return <DashboardView instanceId={tab.id} />;
     case 'dataGrid':
     default: return <DataGrid instanceId={tab.id} />;
   }

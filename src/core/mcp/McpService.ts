@@ -11,7 +11,10 @@ import { QueryHistory } from '../query/QueryHistory';
 import { SecurityGuard } from './SecurityGuard';
 import { isSqlFamily } from './StatementClassifiers';
 import { ActivityBridge } from './ActivityBridge';
+import type { AiActivityEntry } from './ActivityBridge';
 import { Logger } from '../utils/Logger';
+import type { ColumnHeader } from '../types';
+import type { AiResultPayload } from './AiResultBridge';
 
 const DEFAULT_PORT = 37421;
 
@@ -95,6 +98,8 @@ export class McpService {
     private activity: ActivityBridge,
     /** Optional callback to highlight a table in the Schema tree when AI touches it. */
     private revealTable?: (table: string, connectionId: string) => void,
+    /** Capture read-query results so the UI can show them. Returns a tab id. */
+    private onQueryExecuted?: (payload: AiResultPayload) => string | undefined,
   ) {}
 
   get endpoint(): string { return `http://127.0.0.1:${this.port}/mcp`; }
@@ -446,12 +451,18 @@ export class McpService {
       tool: string,
       args: A,
       fn: () => Promise<R>,
-      extra?: { sql?: string; connectionId?: string; rowCountFrom?: (r: R) => number | undefined },
+      extra?: {
+        sql?: string;
+        connectionId?: string;
+        rowCountFrom?: (r: R) => number | undefined;
+        afterSuccess?: (entry: AiActivityEntry, result: R) => void;
+      },
     ): Promise<R> => {
       return activity.record(tool, clientName, JSON.stringify(args), fn, {
         sql: extra?.sql,
         connectionName: extra?.connectionId,
         rowCountFrom: extra?.rowCountFrom,
+        afterSuccess: extra?.afterSuccess,
       });
     };
 
@@ -532,7 +543,7 @@ export class McpService {
     // ── describe_table ──
     mcp.tool(
       'describe_table',
-      'Get full table structure: columns, types, nullable, defaults, primary key, indexes, foreign keys and a CREATE TABLE DDL.',
+      'Get full table structure: columns (with their comments), types, nullable, defaults, primary key, indexes, foreign keys, the table comment and a CREATE TABLE DDL.',
       {
         connectionId: z.string().optional().describe('Connection id from list_connections.'),
         table: z.string().describe('Table name.'),
@@ -540,20 +551,28 @@ export class McpService {
       async (args) => {
         const result = await withActivity('describe_table', args, async () => {
           const conn = await this.getDriver(args.connectionId);
-          const [columns, indexes, foreignKeys, pk] = await Promise.all([
-            conn.driver.getColumns(args.table),
-            conn.driver.getIndexes(args.table).catch(() => []),
-            conn.driver.getForeignKeys(args.table).catch(() => []),
-            conn.driver.getPrimaryKey(args.table).catch(() => []),
+          const table = args.table;
+          const [columns, indexes, foreignKeys, pk, tableComment] = await Promise.all([
+            conn.driver.getColumns(table),
+            conn.driver.getIndexes(table).catch(() => []),
+            conn.driver.getForeignKeys(table).catch(() => []),
+            conn.driver.getPrimaryKey(table).catch(() => []),
+            // Table comment comes from the catalog (MySQL TABLE_COMMENT,
+            // PostgreSQL obj_description, ...); absent for SQLite/MongoDB.
+            conn.driver.getTables()
+              .then(tables => (tables.find(t => t.name === table)
+                ?? tables.find(t => table.endsWith(`.${t.name}`)))?.comment)
+              .catch(() => undefined),
           ]);
-          this.revealTable?.(args.table, conn.id);
+          this.revealTable?.(table, conn.id);
           return {
-            table: args.table,
+            table,
+            tableComment: tableComment ?? '',
             columns,
             primaryKey: pk,
             indexes,
             foreignKeys,
-            ddl: this.buildDdl(conn.driver, args.table, columns, pk),
+            ddl: this.buildDdl(conn.driver, table, columns, pk),
           };
         }, { connectionId: args?.connectionId });
         return textResult(result);
@@ -575,8 +594,12 @@ export class McpService {
         maxRows: z.number().int().min(1).max(1000).optional().describe(`Max rows to return (default ${maxRowsDefault}).`),
       },
       async (args) => {
+        // Captured during execution so the result can be mirrored into the UI.
+        let capturedConn: ResolvedConnection | undefined;
+        let capturedHeaders: ColumnHeader[] | undefined;
         const result = await withActivity('run_query', args, async () => {
           const conn = await this.getDriver(args.connectionId);
+          capturedConn = conn;
           const driverType = conn.driver.driverType;
           if (driverType === 'redis') {
             // maxRows maps to SCAN/collection COUNT for Redis reads.
@@ -598,6 +621,7 @@ export class McpService {
           const start = performance.now();
           try {
             const queryResult = await conn.driver.query(limitSql);
+            capturedHeaders = queryResult.columns;
             const executionTime = Math.round(performance.now() - start);
 
             const columns = queryResult.columns.map(c => c.name);
@@ -624,6 +648,24 @@ export class McpService {
           sql: args.sql,
           connectionId: args?.connectionId,
           rowCountFrom: r => r?.totalRows,
+          // Mirror the (already masked) result into a Sqlens result tab and
+          // remember the tab id on the activity entry for one-click jump-back.
+          afterSuccess: (entry, r) => {
+            if (!this.onQueryExecuted || !capturedConn || !capturedHeaders) { return; }
+            const tabId = this.onQueryExecuted({
+              activityId: entry.id,
+              clientName,
+              connectionId: capturedConn.id,
+              connectionName: capturedConn.name,
+              sql: args.sql,
+              columns: capturedHeaders,
+              rows: r.rows,
+              totalRows: r.totalRows,
+              truncated: r.truncated,
+              executionTime: r.executionTime,
+            });
+            if (tabId) { entry.tabId = tabId; }
+          },
         });
         return textResult(result);
       },
@@ -762,7 +804,7 @@ export class McpService {
     // ── search_schema ──
     mcp.tool(
       'search_schema',
-      'Search across table names and column names by keyword. Faster and broader than list_tables when looking for where data lives.',
+      'Search across table names, column names and table/column comments by keyword. Faster and broader than list_tables when looking for where data lives.',
       {
         connectionId: z.string().optional().describe('Connection id from list_connections.'),
         keyword: z.string().describe('Keyword to search in table/column names (case-insensitive).'),
@@ -778,8 +820,8 @@ export class McpService {
 
           for (const t of tables) {
             if (results.length >= limit) { break; }
-            const nameHit = t.name.toLowerCase().includes(kw);
-            if (nameHit) {
+            const tableCommentHit = !!t.comment && t.comment.toLowerCase().includes(kw);
+            if (t.name.toLowerCase().includes(kw) || tableCommentHit) {
               results.push({ type: t.type, table: t.name, comment: t.comment });
             }
             // Look for matching columns in every table (capped to keep this cheap)
@@ -787,8 +829,9 @@ export class McpService {
               const cols = await conn.driver.getColumns(t.name);
               for (const c of cols) {
                 if (results.length >= limit) { break; }
-                if (c.name.toLowerCase().includes(kw)) {
-                  results.push({ type: 'column', table: t.name, column: c.name, dataType: c.type });
+                const columnCommentHit = !!c.comment && c.comment.toLowerCase().includes(kw);
+                if (c.name.toLowerCase().includes(kw) || columnCommentHit) {
+                  results.push({ type: 'column', table: t.name, column: c.name, dataType: c.type, comment: c.comment });
                 }
               }
             } catch { /* skip columns for this table */ }

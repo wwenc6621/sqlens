@@ -1,0 +1,166 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+}
+
+.dashboard-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
+
+.dashboard-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.dashboard-count {
+  color: var(--vscode-descriptionForeground);
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 400;
+  padding: 0 6px;
+  line-height: 1.6;
+}
+
+.dashboard-toolbar-right { display: inline-flex; gap: 6px; }
+
+.dash-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
+  cursor: pointer;
+}
+
+.dash-btn:disabled { opacity: 0.6; cursor: default; }
+
+.dashboard-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  padding: 24px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+}
+
+.dashboard-empty-hint { max-width: 380px; }
+
+.dashboard-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+  padding: 10px;
+  align-content: start;
+}
+
+.dash-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 240px;
+  border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  overflow: hidden;
+}
+
+.dash-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+}
+
+.dash-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-card-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 2px;
+}
+
+.dash-card-remove:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+  color: var(--vscode-foreground);
+}
+
+.dash-card-body {
+  flex: 1;
+  min-height: 0;
+  padding: 4px;
+}
+
+.dash-chart { width: 100%; height: 100%; min-height: 190px; }
+
+.dash-card-error,
+.dash-card-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 190px;
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.dash-card-error { color: var(--vscode-errorForeground, #f48771); }
+
+.dash-table-wrap { height: 100%; max-height: 320px; overflow: auto; }
+
+.dash-table { border-collapse: collapse; font-size: 12px; width: 100%; }
+
+.dash-table th,
+.dash-table td {
+  border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+  padding: 3px 6px;
+  text-align: left;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-table th {
+  position: sticky;
+  top: 0;
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}

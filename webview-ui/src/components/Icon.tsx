@@ -45,6 +45,7 @@ export type IconName =
   | 'terminal'
   | 'columns'
   | 'locate'
+  | 'chart'
   | 'download';
 
 const STROKE_ICONS: Record<string, React.ReactNode> = {
@@ -229,6 +230,14 @@ const STROKE_ICONS: Record<string, React.ReactNode> = {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
+    </>
+  ),
+  chart: (
+    <>
+      <line x1="4" y1="20" x2="20" y2="20" />
+      <rect x="5" y="11" width="3.4" height="7" rx="0.6" />
+      <rect x="10.3" y="5" width="3.4" height="13" rx="0.6" />
+      <rect x="15.6" y="14" width="3.4" height="4" rx="0.6" />
     </>
   ),
 };

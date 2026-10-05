@@ -129,5 +129,7 @@
   "Additional Redis commands to block from execution (danger commands are always blocked)": "Additional Redis commands to block from execution (danger commands are always blocked)",
   "Redis: Export to JSON": "Redis: Export to JSON",
   "Redis: Import from JSON": "Redis: Import from JSON",
-  "Open MCP Server Panel": "Open MCP Server Panel"
+  "Open MCP Server Panel": "Open MCP Server Panel",
+  "Open Dashboard": "Open Dashboard",
+  "Add to Dashboard...": "Add to Dashboard..."
 }

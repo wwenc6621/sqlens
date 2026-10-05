@@ -17,6 +17,8 @@ interface AiActivityEntry {
   success: boolean;
   error?: string;
   blocked?: boolean;
+  /** Result tab id; present for read queries whose result is shown in the grid. */
+  tabId?: string;
 }
 
 interface PendingWrite {
@@ -39,7 +41,7 @@ function timeStr(ts: number): string {
 }
 
 /** One line of the activity feed. */
-function EntryRow({ entry }: { entry: AiActivityEntry }) {
+function EntryRow({ entry, onOpen }: { entry: AiActivityEntry; onOpen: (activityId: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const statusClass = !entry.success ? 'error' : entry.blocked ? 'blocked' : 'ok';
   const statusIcon = !entry.success ? 'close' : entry.blocked ? 'lock' : 'checkCircle';
@@ -64,6 +66,13 @@ function EntryRow({ entry }: { entry: AiActivityEntry }) {
           {entry.connectionName && <div className="aia-conn">Connection: {entry.connectionName}</div>}
           {entry.error && <div className="aia-err">Error: {entry.error}</div>}
           <pre className="aia-sql">{sql}</pre>
+          {entry.tabId && entry.success && (
+            <div className="aia-entry-actions">
+              <button className="aia-btn" onClick={() => onOpen(entry.id)}>
+                <Icon name="table" size={12} /> {t('Open in grid')}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -113,6 +122,10 @@ export default function AiActivityView({ instanceId = 'default' }: { instanceId?
     post({ type: 'aiActivityResult', data: { pendingId, action } });
   };
 
+  const handleOpenResult = (activityId: string) => {
+    post({ type: 'openAiResultTab', activityId });
+  };
+
   const f = filter.toLowerCase();
   const filtered = data.entries.filter(e =>
     !f || e.tool.toLowerCase().includes(f) || e.client.toLowerCase().includes(f) ||
@@ -159,7 +172,7 @@ export default function AiActivityView({ instanceId = 'default' }: { instanceId?
           </div>
         ) : (
           filtered.map(entry => (
-            <EntryRow key={entry.id} entry={entry} />
+            <EntryRow key={entry.id} entry={entry} onOpen={handleOpenResult} />
           ))
         )}
       </div>

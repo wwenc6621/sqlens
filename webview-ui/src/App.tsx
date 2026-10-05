@@ -8,6 +8,8 @@ import QueryPlanView from './panels/QueryPlan/QueryPlanView';
 import QuickView from './panels/QuickView/QuickView';
 import CreateTable from './panels/CreateTable/CreateTable';
 import SchemaPanel from './panels/Schema/SchemaPanel';
+import ChartView from './panels/Chart/ChartView';
+import DashboardView from './panels/Dashboard/DashboardView';
 
 declare global {
   interface Window {
@@ -37,6 +39,10 @@ export default function App() {
       return <QuickView />;
     case 'schema':
       return <SchemaPanel />;
+    case 'chart':
+      return <ChartView />;
+    case 'dashboard':
+      return <DashboardView />;
     default:
       return <div style={{ padding: 20, color: 'var(--vscode-foreground)' }}>Unknown panel: {panelType}</div>;
   }

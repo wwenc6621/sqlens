@@ -2,6 +2,30 @@
 
 All notable changes to Sqlens are documented here.
 
+## 0.5.1 (2026-10-05)
+
+### Fixed
+
+- **点击「可视化」不再跳到 AI Activity 面板**：AI 只读查询的结果页签打开后，「AI 活动」面板的自动打开逻辑会抢走激活权，把视图切回去。现在当结果页签刚打开时，AI 活动面板只创建、不抢占激活，焦点留在结果页签上。
+- **重复点击「可视化」不再新建多个图表页签**：图表页签 ID 改为按来源页签派生（`chart-<来源页签>`），再次点击会刷新同一个图表页签，而不是每点一次多开一个。
+
+## 0.5.0 (2026-10-05)
+
+### Added
+
+- **查询结果可视化**：任意结果表格新增「可视化」按钮，在独立页签中用 ECharts 渲染柱状 / 折线 / 饼图；可切换维度与度量、导出 PNG。AI 查询结果同样适用。
+- **AI 查询结果直接进入 Sqlens 面板**：AI 助手通过 MCP 执行的只读查询，其结果会以**只读数据表格**出现在结果面板（标题形如 `AI · CodeBuddy · 连接名`）；同一条 SQL 合并到同一页签，AI 活动记录可一键跳回，页签关闭后也能重开。结果页签上同样可以一键出图。
+- **把已有表 / 列注释透给 AI**：MCP 的 `describe_table` 现在返回表注释与列注释（MySQL `TABLE_COMMENT` / `COLUMN_COMMENT`、PostgreSQL `obj_description` / `col_description`、SQL Server 扩展属性、ClickHouse `system.comment`），`search_schema` 支持按注释文本匹配，帮助 AI 写出更准确的 SQL；SQLite / MongoDB 无原生注释时不报错。
+- **保存为查询 / 仪表盘**：任意结果或图表页签可「保存为查询」（写入该连接的已保存查询），或「添加到仪表盘」；仪表盘以卡片网格展示（图表 / 表格卡片），支持手动刷新与移除卡片，持久化在本机（跨项目），重开 IDE 仍在。
+
+### Changed
+
+- MCP `describe_table` / `search_schema` 的工具描述更新，说明其会返回 / 匹配表与列的注释。
+
+### Testing
+
+- 单元测试新增图表数据整形、AI 结果桥接（同 SQL 合并 / LRU 淘汰）、仪表盘持久化，以及 MCP 注释透传的用例；`npm run test:unit` 共 70 项。
+
 ## 0.4.1 (2026-09-29)
 
 ### Added
