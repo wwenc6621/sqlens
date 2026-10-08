@@ -156,6 +156,8 @@ const zh: Record<string, string> = {
   'Port': '端口',
   'Username': '用户名',
   'Password': '密码',
+  'Show password': '显示密码',
+  'Hide password': '隐藏密码',
   'Use SSH Tunnel': '使用 SSH 隧道',
   'Import from SSH Config (~/.ssh/config)': '从 SSH 配置导入（~/.ssh/config）',
   '-- Manual Configuration --': '-- 手动配置 --',

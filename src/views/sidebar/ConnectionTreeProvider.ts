@@ -1,8 +1,8 @@
-import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { t } from '../../core/i18n';
+import * as vscode from 'vscode';
 import { ConnectionManager, RELATIONAL_DRIVERS } from '../../core/connection/ConnectionManager';
+import { t } from '../../core/i18n';
 import { ConnectionConfig, DATABASE_TYPE_META, DatabaseType } from '../../core/types';
 
 type TreeItem = ConnectionGroupItem | ConnectionItem | DatabaseItem;
@@ -61,6 +61,22 @@ export function getConnectionIcon(
 const GROUPS_KEY = 'sqlens.connectionGroups';
 
 /**
+ * Case-insensitive fuzzy match for database filtering: a direct substring hit
+ * wins, otherwise the query characters must appear in order within the text.
+ */
+function fuzzyMatchDatabaseName(name: string, query: string): boolean {
+  const text = name.toLowerCase();
+  const needle = query.trim().toLowerCase();
+  if (!needle) { return true; }
+  if (text.includes(needle)) { return true; }
+  let qi = 0;
+  for (let i = 0; i < text.length && qi < needle.length; i++) {
+    if (text[i] === needle[qi]) { qi++; }
+  }
+  return qi === needle.length;
+}
+
+/**
  * Folders are an aggregation over `config.group`, so an empty folder would
  * otherwise vanish. This list keeps them around until they are deleted.
  */
@@ -86,6 +102,8 @@ export class ConnectionItem extends vscode.TreeItem {
   constructor(
     public readonly config: ConnectionConfig,
     public readonly connected: boolean,
+    /** Active fuzzy database filter for this connection, if any. */
+    public readonly dbFilter?: string,
   ) {
     // Connected connections expand into their databases; disconnected ones have
     // nothing to show.
@@ -98,9 +116,11 @@ export class ConnectionItem extends vscode.TreeItem {
     const isProject = config.options?.sqlensProjectConfig === true || config.tags?.includes('project-config');
 
     this.id = `conn:${config.id}`;
-    this.description = isProject
+    const baseDescription = isProject
       ? (connected ? `${t('[Project]')} ${meta.label} • ${t('Connected')}` : `${t('[Project]')} ${meta.label}`)
       : (connected ? `${meta.label} • ${t('Connected')}` : meta.label);
+    // Surface the active database filter on the row so its effect is obvious.
+    this.description = dbFilter ? `${baseDescription} • ${t('Filtered')}` : baseDescription;
 
     this.tooltip = this.buildTooltip(config, connected, meta.label);
 
@@ -128,6 +148,11 @@ export class ConnectionItem extends vscode.TreeItem {
     // (such items render in every tree view's context menu), so relational-only
     // actions match this positive tag instead of excluding each driver.
     this.contextValue += RELATIONAL_DRIVERS.includes(config.type) ? ':rdb' : ':nordb';
+    // A trailing tag lets the context menu offer "Clear Database Filter" only
+    // while a filter is active on this connection.
+    if (dbFilter) {
+      this.contextValue += ':filtered';
+    }
 
     // Disconnected rows connect on double click: the row command records the
     // click and connects only when clicked twice quickly (see
@@ -289,6 +314,35 @@ export class ConnectionTreeProvider implements vscode.TreeDataProvider<TreeItem>
     );
   }
 
+  /**
+   * Per-connection fuzzy database-name filters. Empty for a connection means
+   * "show every database"; the map only holds connections the user filtered.
+   */
+  private dbFilters = new Map<string, string>();
+
+  /** Active database filter for a connection, if any. */
+  getDatabaseFilter(connectionId: string): string | undefined {
+    return this.dbFilters.get(connectionId);
+  }
+
+  /** Apply (or, when `query` is blank, clear) a connection's database filter. */
+  setDatabaseFilter(connectionId: string, query: string): void {
+    const trimmed = query.trim();
+    if (trimmed) {
+      this.dbFilters.set(connectionId, trimmed);
+    } else {
+      this.dbFilters.delete(connectionId);
+    }
+    this.refresh();
+  }
+
+  /** Drop a connection's database filter (no-op when none is set). */
+  clearDatabaseFilter(connectionId: string): void {
+    if (this.dbFilters.delete(connectionId)) {
+      this.refresh();
+    }
+  }
+
   /** Coalesce rapid refresh calls so the welcome view never re-renders twice. */
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -314,7 +368,7 @@ export class ConnectionTreeProvider implements vscode.TreeDataProvider<TreeItem>
 
     if (element instanceof DatabaseItem) {
       const owner = configs.find(c => c.id === element.connectionId);
-      return owner ? new ConnectionItem(owner, true) : undefined;
+      return owner ? new ConnectionItem(owner, true, this.dbFilters.get(owner.id)) : undefined;
     }
 
     if (element instanceof ConnectionItem && element.config.group) {
@@ -371,14 +425,14 @@ export class ConnectionTreeProvider implements vscode.TreeDataProvider<TreeItem>
 
     for (const groupName of [...declaredPresent, ...derived]) {
       const children = (grouped.get(groupName) || []).map(
-        c => new ConnectionItem(c, this.connectionManager.isConnected(c.id))
+        c => new ConnectionItem(c, this.connectionManager.isConnected(c.id), this.dbFilters.get(c.id))
       );
       items.push(new ConnectionGroupItem(groupName, children));
     }
 
     // Add ungrouped connections
     for (const config of ungrouped) {
-      items.push(new ConnectionItem(config, this.connectionManager.isConnected(config.id)));
+      items.push(new ConnectionItem(config, this.connectionManager.isConnected(config.id), this.dbFilters.get(config.id)));
     }
 
     return items;
@@ -393,8 +447,11 @@ export class ConnectionTreeProvider implements vscode.TreeDataProvider<TreeItem>
       const databases = await driver.getDatabases();
       const currentDb = await driver.getCurrentDatabase().catch(() => '');
       const activeDb = currentDb || config.database || databases[0]?.name;
+      // Only show databases matching this connection's active fuzzy filter.
+      const filter = this.dbFilters.get(config.id);
 
       return databases
+        .filter(db => !filter || fuzzyMatchDatabaseName(db.name, filter))
         .map(db => new DatabaseItem(db.name, config.id, db.name === activeDb, config.type))
         .sort((a, b) => {
           if (a.isActive) { return -1; }

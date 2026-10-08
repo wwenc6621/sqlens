@@ -17,6 +17,8 @@
   "Delete Query": "删除查询",
   "Refresh Saved Queries": "刷新已保存查询",
   "Refresh Databases": "刷新数据库",
+  "Filter Databases": "筛选数据库…",
+  "Clear Database Filter": "清除数据库筛选",
   "Edit Connection": "编辑连接",
   "Delete Connection": "删除连接",
   "Connect": "连接",

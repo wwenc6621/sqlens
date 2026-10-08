@@ -2,7 +2,7 @@
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
   "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis/ClickHouse/Elasticsearch/MongoDB/SQL Server connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
@@ -251,6 +251,18 @@
         "title": "%Refresh Databases%",
         "category": "%Sqlens%",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "sqlens.filterDatabases",
+        "title": "%Filter Databases%",
+        "category": "%Sqlens%",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "sqlens.clearDatabaseFilter",
+        "title": "%Clear Database Filter%",
+        "category": "%Sqlens%",
+        "icon": "$(clear-all)"
       },
       {
         "command": "sqlens.editConnection",
@@ -743,6 +755,11 @@
           "group": "inline"
         },
         {
+          "command": "sqlens.filterDatabases",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "group": "inline@1"
+        },
+        {
           "command": "sqlens.selectConnection",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
           "group": "1_manage@0"
@@ -763,9 +780,19 @@
           "group": "1_manage@3"
         },
         {
+          "command": "sqlens.refreshDatabases",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "group": "2_query@5"
+        },
+        {
           "command": "sqlens.newSavedQuery",
           "when": "view == sqlens.connections && viewItem =~ /^connection/",
           "group": "2_query@0"
+        },
+        {
+          "command": "sqlens.clearDatabaseFilter",
+          "when": "view == sqlens.connections && viewItem =~ /:filtered$/",
+          "group": "1_manage@8"
         },
         {
           "command": "sqlens.newSavedQuery",

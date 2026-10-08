@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { postMessage, onMessage } from '../../hooks/useVsCode';
-import Icon from '../../components/Icon';
+import { useCallback, useEffect, useState } from 'react';
 import DbTypeIcon, { dbLabelColor } from '../../components/DbTypeIcon';
+import Icon from '../../components/Icon';
+import { onMessage, postMessage } from '../../hooks/useVsCode';
 import { t } from '../../i18n';
 import './ConnectionForm.css';
 
@@ -102,6 +102,38 @@ const req = (label: string) => (
     {label}<span className="required-mark">*</span>
   </>
 );
+
+/**
+ * Password input with an eye toggle that reveals the raw value.
+ * Used for every secret field (DB password, SSH password/passphrase, client secret).
+ */
+function PasswordInput({ value, onChange, placeholder }: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  const toggleLabel = visible ? t('Hide password') : t('Show password');
+  return (
+    <div className="password-field">
+      <input
+        type={visible ? 'text' : 'password'}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+      <button
+        type="button"
+        className="password-toggle"
+        onClick={() => setVisible(v => !v)}
+        title={toggleLabel}
+        aria-label={toggleLabel}
+      >
+        <Icon name={visible ? 'eyeOff' : 'eye'} size={14} />
+      </button>
+    </div>
+  );
+}
 
 export default function ConnectionForm() {
   const [form, setForm] = useState<FormData>(defaultForm);
@@ -345,10 +377,9 @@ export default function ConnectionForm() {
                       </div>
                       <div className="form-field">
                         <label>{t('Password')}</label>
-                        <input
-                          type="password"
+                        <PasswordInput
                           value={form.password}
-                          onChange={e => updateField('password', e.target.value)}
+                          onChange={v => updateField('password', v)}
                           placeholder="••••••••"
                         />
                       </div>
@@ -389,10 +420,9 @@ export default function ConnectionForm() {
                       </div>
                       <div className="form-field">
                         <label>{t('Password')}</label>
-                        <input
-                          type="password"
+                        <PasswordInput
                           value={form.password}
-                          onChange={e => updateField('password', e.target.value)}
+                          onChange={v => updateField('password', v)}
                           placeholder="••••••••"
                         />
                       </div>
@@ -433,10 +463,9 @@ export default function ConnectionForm() {
                       </div>
                       <div className="form-field">
                         <label>{t('Password')}</label>
-                        <input
-                          type="password"
+                        <PasswordInput
                           value={form.password}
-                          onChange={e => updateField('password', e.target.value)}
+                          onChange={v => updateField('password', v)}
                           placeholder="••••••••"
                         />
                       </div>
@@ -478,10 +507,9 @@ export default function ConnectionForm() {
                   </div>
                   <div className="form-field">
                     <label>{t('Password')}</label>
-                    <input
-                      type="password"
+                    <PasswordInput
                       value={form.password}
-                      onChange={e => updateField('password', e.target.value)}
+                      onChange={v => updateField('password', v)}
                       placeholder="••••••••"
                     />
                   </div>
@@ -567,10 +595,9 @@ export default function ConnectionForm() {
                         </div>
                         <div className="form-field">
                           <label>{t('Client Secret')}</label>
-                          <input
-                            type="password"
+                          <PasswordInput
                             value={(form.options.clientSecret as string) || ''}
-                            onChange={e => updateOption('clientSecret', e.target.value)}
+                            onChange={v => updateOption('clientSecret', v)}
                           />
                         </div>
                       </>
@@ -682,10 +709,9 @@ export default function ConnectionForm() {
                 {form.ssh.authMethod === 'password' && (
                   <div className="form-field">
                     <label>{req(t('SSH Password'))}</label>
-                    <input
-                      type="password"
+                    <PasswordInput
                       value={form.ssh.password || ''}
-                      onChange={e => updateSSH('password', e.target.value)}
+                      onChange={v => updateSSH('password', v)}
                       placeholder="••••••••"
                     />
                   </div>
@@ -704,10 +730,9 @@ export default function ConnectionForm() {
                     </div>
                     <div className="form-field">
                       <label>{t('Passphrase (optional)')}</label>
-                      <input
-                        type="password"
+                      <PasswordInput
                         value={form.ssh.passphrase || ''}
-                        onChange={e => updateSSH('passphrase', e.target.value)}
+                        onChange={v => updateSSH('passphrase', v)}
                         placeholder="••••••••"
                       />
                     </div>

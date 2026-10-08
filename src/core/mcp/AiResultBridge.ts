@@ -19,10 +19,11 @@ export interface AiResultRecord {
   payload: AiResultPayload;
 }
 
-/** Collapse whitespace and drop a trailing semicolon so equal queries merge. */
-function normalizeSql(sql: string): string {
-  return sql.replace(/\s+/g, ' ').replace(/;\s*$/, '').trim();
-}
+/**
+ * Fixed tab id shared by every MCP/AI-triggered result. A busy assistant that
+ * runs many queries refreshes this one tab instead of piling up new ones.
+ */
+export const AI_LIVE_TAB_ID = 'ai-result-live';
 
 /** Stable short id from a string (djb2). */
 function hash(input: string): string {
@@ -36,64 +37,87 @@ function hash(input: string): string {
 /**
  * Keeps AI query results addressable from the AI Activity panel.
  *
- * The same connection + normalized SQL maps to one tab id, so a repeated query
- * refreshes the existing tab instead of piling up new ones. Records are kept
- * (LRU-bounded) so a closed result tab can still be reopened from the activity
- * list, and so `getByTab` can serve a rebuilt tab.
+ * Two distinct behaviours:
+ * - `present()` — the MCP path. Every AI query refreshes the single shared
+ *   {@link AI_LIVE_TAB_ID} tab, so an assistant running many statements never
+ *   opens more than one result tab.
+ * - `recordForActivity()` — the user path. Opening a record from the AI
+ *   Activity panel builds a per-activity tab, so the user opens exactly as many
+ *   tabs as they choose.
+ *
+ * Payloads are retained (LRU-bounded) so a closed result tab can still be
+ * reopened from the activity list, and so `getByTab` can serve a rebuilt tab.
  */
 export class AiResultBridge {
-  /** tabId -> latest record (used to reopen a closed tab). */
-  private byTab = new Map<string, AiResultRecord>();
-  /** activityId -> tabId (used by the "open in grid" jump). */
-  private byActivity = new Map<string, string>();
+  /** activityId -> payload (lets the activity list reopen an old result). */
+  private byActivity = new Map<string, AiResultPayload>();
+  /** tabId -> payload for addressable tabs (the live tab + opened activity tabs). */
+  private byTab = new Map<string, AiResultPayload>();
   /** tab ids, least-recently-touched first. */
-  private order: string[] = [];
+  private tabOrder: string[] = [];
+  /** activity ids, least-recently-touched first. */
+  private activityOrder: string[] = [];
 
   constructor(
     private readonly openTab: (record: AiResultRecord) => void,
     private readonly maxEntries = 200,
   ) {}
 
-  /** Capture a result and open/refresh its tab. Returns the tab id. */
+  /**
+   * MCP path: capture a result and refresh the single shared AI tab.
+   * Returns the tab id (always {@link AI_LIVE_TAB_ID}).
+   */
   present(payload: AiResultPayload): string {
-    const tabId = `ai-result-${hash(`${payload.connectionId}\u0000${normalizeSql(payload.sql)}`)}`;
-    const record: AiResultRecord = { tabId, payload };
-    this.byTab.set(tabId, record);
-    this.byActivity.set(payload.activityId, tabId);
-    this.touch(tabId);
-    this.evict();
-    this.openTab(record);
-    return tabId;
+    this.rememberActivity(payload.activityId, payload);
+    this.rememberTab(AI_LIVE_TAB_ID, payload);
+    this.openTab({ tabId: AI_LIVE_TAB_ID, payload });
+    return AI_LIVE_TAB_ID;
   }
 
-  /** Resolve the tab that shows a given AI activity's result. */
-  getByActivity(activityId: string): AiResultRecord | undefined {
-    const tabId = this.byActivity.get(activityId);
-    return tabId ? this.byTab.get(tabId) : undefined;
+  /**
+   * User path: build a record for an AI activity opened from the Activity
+   * panel. Each activity gets its own tab id, so opening several records opens
+   * several tabs. Returns undefined for an unknown activity.
+   */
+  recordForActivity(activityId: string): AiResultRecord | undefined {
+    const payload = this.byActivity.get(activityId);
+    if (!payload) { return undefined; }
+    const tabId = `ai-result-${hash(activityId)}`;
+    this.rememberTab(tabId, payload);
+    return { tabId, payload };
   }
 
+  /** Resolve the record behind a tab id (used to rebuild / save a tab). */
   getByTab(tabId: string): AiResultRecord | undefined {
-    return this.byTab.get(tabId);
+    const payload = this.byTab.get(tabId);
+    return payload ? { tabId, payload } : undefined;
   }
 
-  /** Drop a tab's record and its activity links. */
+  /** Drop a tab's record. The activity link is kept so it can be reopened. */
   removeTab(tabId: string): void {
     if (!this.byTab.delete(tabId)) { return; }
-    for (const [activityId, id] of [...this.byActivity]) {
-      if (id === tabId) { this.byActivity.delete(activityId); }
+    this.tabOrder = this.tabOrder.filter(id => id !== tabId);
+  }
+
+  /** Remember an activity payload, evicting the oldest beyond the bound. */
+  private rememberActivity(activityId: string, payload: AiResultPayload): void {
+    this.byActivity.set(activityId, payload);
+    this.activityOrder = this.activityOrder.filter(id => id !== activityId);
+    this.activityOrder.push(activityId);
+    while (this.activityOrder.length > this.maxEntries) {
+      const oldest = this.activityOrder.shift();
+      if (oldest) { this.byActivity.delete(oldest); }
     }
-    this.order = this.order.filter(id => id !== tabId);
   }
 
-  private touch(tabId: string): void {
-    this.order = this.order.filter(id => id !== tabId);
-    this.order.push(tabId);
-  }
-
-  private evict(): void {
-    while (this.order.length > this.maxEntries) {
-      const oldest = this.order.shift();
-      if (oldest) { this.removeTab(oldest); }
+  /** Remember a tab payload, evicting the oldest beyond the bound. */
+  private rememberTab(tabId: string, payload: AiResultPayload): void {
+    this.byTab.set(tabId, payload);
+    this.tabOrder = this.tabOrder.filter(id => id !== tabId);
+    this.tabOrder.push(tabId);
+    while (this.tabOrder.length > this.maxEntries) {
+      const oldest = this.tabOrder.shift();
+      if (oldest) { this.byTab.delete(oldest); }
     }
   }
 }

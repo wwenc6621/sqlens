@@ -17,6 +17,8 @@
   "Delete Query": "Delete Query",
   "Refresh Saved Queries": "Refresh Saved Queries",
   "Refresh Databases": "Refresh Databases",
+  "Filter Databases": "Filter Databases...",
+  "Clear Database Filter": "Clear Database Filter",
   "Edit Connection": "Edit Connection",
   "Delete Connection": "Delete Connection",
   "Connect": "Connect",

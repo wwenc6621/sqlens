@@ -310,9 +310,9 @@ test('chart data shaping coerces values, uses index axis and caps rows', () => {
 
 // ── AI result bridge ────────────────────────────────────────────────────────
 
-test('ai result bridge merges equal queries, maps activities and evicts LRU', () => {
+test('ai result bridge reuses one MCP tab and opens per-activity tabs on demand', () => {
   const opened: string[] = [];
-  const bridge = new AiResultBridge(record => { opened.push(record.tabId); }, 2);
+  const bridge = new AiResultBridge(record => { opened.push(record.tabId); });
   const base = {
     clientName: 'CodeBuddy',
     connectionId: 'c1',
@@ -324,22 +324,25 @@ test('ai result bridge merges equal queries, maps activities and evicts LRU', ()
     executionTime: 1,
   };
 
+  // Every MCP query refreshes the single shared live tab, whatever the SQL.
   const t1 = bridge.present({ ...base, activityId: 'a1', sql: 'SELECT 1' });
-  // Same statement up to whitespace / trailing semicolon -> same tab.
-  const t2 = bridge.present({ ...base, activityId: 'a2', sql: 'SELECT   1 ;' });
+  const t2 = bridge.present({ ...base, activityId: 'a2', sql: 'SELECT 2' });
   assert.equal(t1, t2);
-  assert.equal(bridge.getByActivity('a1')?.tabId, t1);
-  assert.equal(bridge.getByActivity('a2')?.tabId, t1);
   assert.equal(opened.length, 2);
+  // The live tab reflects the most recent query.
+  assert.equal(bridge.getByTab(t1)?.payload.sql, 'SELECT 2');
 
-  // A different statement opens a different tab.
-  const t3 = bridge.present({ ...base, activityId: 'a3', sql: 'SELECT 2' });
-  assert.notEqual(t3, t1);
+  // The user opening from the activity panel gets one tab per activity.
+  const r1 = bridge.recordForActivity('a1');
+  const r2 = bridge.recordForActivity('a2');
+  assert.ok(r1 && r2);
+  assert.notEqual(r1!.tabId, t1);
+  assert.notEqual(r1!.tabId, r2!.tabId);
+  assert.equal(r1!.payload.sql, 'SELECT 1');
+  assert.equal(bridge.getByTab(r1!.tabId)?.payload.sql, 'SELECT 1');
 
-  // maxEntries = 2: presenting a third distinct tab evicts the oldest.
-  const t4 = bridge.present({ ...base, activityId: 'a4', sql: 'SELECT 3' });
-  assert.equal(bridge.getByTab(t1), undefined);
-  assert.equal(bridge.getByTab(t4)?.payload.sql, 'SELECT 3');
+  // Unknown activity -> nothing to open.
+  assert.equal(bridge.recordForActivity('missing'), undefined);
 });
 
 // ── Dashboard store ─────────────────────────────────────────────────────────

@@ -1,50 +1,49 @@
-import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import { glob } from 'glob';
+import * as os from 'os';
+import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import * as vscode from 'vscode';
+import { DashboardStore } from './core/analytics/DashboardStore';
 import { ConnectionManager } from './core/connection/ConnectionManager';
 import { ConnectionStorage } from './core/connection/ConnectionStorage';
 import { ConnectionTransfer } from './core/connection/ConnectionTransfer';
-import { ConnectionTreeProvider, ConnectionDragAndDropController } from './views/sidebar/ConnectionTreeProvider';
-import { SchemaTreeProvider } from './views/sidebar/SchemaTreeProvider';
-import { SchemaWebviewViewProvider } from './views/schema/SchemaWebviewViewProvider';
-import { SavedQueryTreeProvider } from './views/sidebar/SavedQueryTreeProvider';
-import { Logger, LogEntry } from './core/utils/Logger';
-import { WebviewManager } from './views/webview/WebviewManager';
-import { QueryResultsViewProvider } from './views/webview/QueryResultsViewProvider';
-import { SchemaProvider } from './core/schema/SchemaProvider';
+import { ProjectConnectionStorage } from './core/connection/ProjectConnectionStorage';
+import type { DatabaseDriver, RowEditCapable } from './core/drivers/DatabaseDriver';
 import type { RedisDriver } from './core/drivers/RedisDriver';
-import { isRedisGroup, decodeRedisKeyTable } from './core/drivers/redisTableEncoding';
+import { decodeRedisKeyTable, isRedisGroup } from './core/drivers/redisTableEncoding';
+import { initI18n, t } from './core/i18n';
+import { ActivityBridge } from './core/mcp/ActivityBridge';
+import type { AiResultRecord } from './core/mcp/AiResultBridge';
+import { AiResultBridge } from './core/mcp/AiResultBridge';
+import { AssistantRegistrar } from './core/mcp/AssistantRegistrar';
+import { McpService } from './core/mcp/McpService';
 import { QueryEngine } from './core/query/QueryEngine';
 import { QueryHistory } from './core/query/QueryHistory';
-import { SQLCompletionProvider } from './views/editor/SQLCompletionProvider';
-import { SQLHoverProvider } from './views/editor/SQLHoverProvider';
-import { SQLCodeLensProvider } from './views/editor/SQLCodeLensProvider';
+import { SchemaProvider } from './core/schema/SchemaProvider';
 import {
-  ConnectionConfig,
-  DatabaseType,
-  DATABASE_TYPE_META,
-  WebviewMessage,
-  QueryResult,
-  ColumnHeader,
-  ColumnInfo,
-  createDefaultConnectionConfig,
-  SSLMode,
+    ColumnHeader,
+    ColumnInfo,
+    ConnectionConfig,
+    createDefaultConnectionConfig,
+    DATABASE_TYPE_META,
+    DatabaseType,
+    QueryResult,
+    SSLMode,
+    WebviewMessage,
 } from './core/types';
-import { DriverFactory } from './core/drivers';
-import type { DatabaseDriver, RowEditCapable } from './core/drivers/DatabaseDriver';
-import { ProjectConnectionStorage } from './core/connection/ProjectConnectionStorage';
 import { DatabaseDumpService } from './core/utils/DatabaseDumpService';
 import { ImportExportService } from './core/utils/ImportExportService';
-import { McpService } from './core/mcp/McpService';
-import { ActivityBridge } from './core/mcp/ActivityBridge';
-import { AiResultBridge } from './core/mcp/AiResultBridge';
-import type { AiResultRecord } from './core/mcp/AiResultBridge';
-import { DashboardStore } from './core/analytics/DashboardStore';
-import { AssistantRegistrar } from './core/mcp/AssistantRegistrar';
-import { initI18n, t } from './core/i18n';
+import { LogEntry, Logger } from './core/utils/Logger';
+import { SQLCodeLensProvider } from './views/editor/SQLCodeLensProvider';
+import { SQLCompletionProvider } from './views/editor/SQLCompletionProvider';
+import { SQLHoverProvider } from './views/editor/SQLHoverProvider';
+import { SchemaWebviewViewProvider } from './views/schema/SchemaWebviewViewProvider';
+import { ConnectionDragAndDropController, ConnectionTreeProvider } from './views/sidebar/ConnectionTreeProvider';
+import { SavedQueryTreeProvider } from './views/sidebar/SavedQueryTreeProvider';
+import { SchemaTreeProvider } from './views/sidebar/SchemaTreeProvider';
+import { QueryResultsViewProvider } from './views/webview/QueryResultsViewProvider';
+import { WebviewManager } from './views/webview/WebviewManager';
 
 let connectionManager: ConnectionManager;
 let databaseDumpService: DatabaseDumpService;
@@ -448,10 +447,12 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    // "Open in grid" jump from the AI Activity panel.
+    // "Open in grid" jump from the AI Activity panel. This is the user-driven
+    // path: each record the user opens gets its own tab (per activity), unlike
+    // the single shared tab used for MCP-triggered results.
     if ((message as any).type === 'openAiResultTab') {
       const activityId = (message as any).activityId as string | undefined;
-      const record = activityId ? aiResultBridge?.getByActivity(activityId) : undefined;
+      const record = activityId ? aiResultBridge?.recordForActivity(activityId) : undefined;
       if (record) { presentAiResultTab(record); }
       return;
     }
@@ -1956,8 +1957,18 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('sqlens.newQuery', async (item?: any) => {
-      const requestedConnId = item?.config?.id || item?.id || item?.connectionId;
-      const activeConnId = requestedConnId || connectionManager.activeConnectionId;
+      // 只接受明确的连接来源：连接节点用 config.id，数据库节点用 connectionId。
+      // 不再使用带前缀的 TreeItem.id（conn:/group:/db:），避免把节点 id 当成连接 id。
+      const requestedConnId =
+        item?.config?.id ||
+        (typeof item === 'string' ? item : item?.connectionId);
+
+      // 请求的连接不可用时，回退到当前活动连接，而不是直接报错。
+      const activeConnId =
+        requestedConnId && connectionManager.isConnected(requestedConnId)
+          ? requestedConnId
+          : connectionManager.activeConnectionId;
+
       if (!activeConnId) {
         vscode.window.showWarningMessage(t('No active connection. Connect to a database first.'));
         return;
@@ -3735,6 +3746,30 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
       connectionTreeProvider.refresh();
+    }),
+
+    // Fuzzy-filter a connection's database list from the tree.
+    vscode.commands.registerCommand('sqlens.filterDatabases', async (item?: any) => {
+      const connectionId = ConnectionTreeProvider.getConnectionId(item) || item?.config?.id;
+      if (!connectionId) { return; }
+
+      const current = connectionTreeProvider.getDatabaseFilter(connectionId);
+      const query = await vscode.window.showInputBox({
+        title: t('Filter Databases'),
+        prompt: t('Type to filter databases by name'),
+        placeHolder: t('e.g. user, order, log'),
+        value: current || '',
+      });
+      // Cancelled (undefined): keep the filter as-is. Empty string clears it.
+      if (query === undefined) { return; }
+      connectionTreeProvider.setDatabaseFilter(connectionId, query);
+    }),
+
+    // Remove a connection's database filter.
+    vscode.commands.registerCommand('sqlens.clearDatabaseFilter', (item?: any) => {
+      const connectionId = ConnectionTreeProvider.getConnectionId(item) || item?.config?.id;
+      if (!connectionId) { return; }
+      connectionTreeProvider.clearDatabaseFilter(connectionId);
     }),
   );
 
