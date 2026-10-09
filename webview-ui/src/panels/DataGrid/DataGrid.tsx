@@ -315,12 +315,12 @@ interface HeaderTooltipState {
 
 /**
  * Header tooltip: the column comment first (when the catalog provides one),
- * then the interaction hint on the next line.
+ * otherwise just the column name and type.
  */
 function buildColumnTooltip(col: ColumnHeader): string {
-  const hint = `${col.name} (${col.type}) — Click to select column, Ctrl+click sort to multi-sort`;
+  const base = `${col.name} (${col.type})`;
   const comment = typeof col.comment === 'string' ? col.comment.trim() : '';
-  return comment ? `${comment}\n${hint}` : hint;
+  return comment ? `${comment}\n${base}` : base;
 }
 
 export default function DataGrid({ instanceId = 'default' }: { instanceId?: string }) {

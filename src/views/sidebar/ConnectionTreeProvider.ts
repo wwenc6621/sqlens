@@ -89,7 +89,7 @@ export class ConnectionGroupItem extends vscode.TreeItem {
     public readonly groupName: string,
     public readonly children: ConnectionItem[] = [],
   ) {
-    super(groupName, vscode.TreeItemCollapsibleState.Expanded);
+    super(groupName, vscode.TreeItemCollapsibleState.Collapsed);
     // A stable id keeps the expand/collapse state across refreshes.
     this.id = `group:${groupName}`;
     this.iconPath = new vscode.ThemeIcon('folder');
@@ -116,11 +116,14 @@ export class ConnectionItem extends vscode.TreeItem {
     const isProject = config.options?.sqlensProjectConfig === true || config.tags?.includes('project-config');
 
     this.id = `conn:${config.id}`;
-    const baseDescription = isProject
-      ? (connected ? `${t('[Project]')} ${meta.label} • ${t('Connected')}` : `${t('[Project]')} ${meta.label}`)
-      : (connected ? `${meta.label} • ${t('Connected')}` : meta.label);
-    // Surface the active database filter on the row so its effect is obvious.
-    this.description = dbFilter ? `${baseDescription} • ${t('Filtered')}` : baseDescription;
+    // The type is conveyed by the type-specific icon, so the row description
+    // only carries status hints (project / connected / filtered) instead of
+    // repeating the database type name.
+    const statusBits: string[] = [];
+    if (isProject) { statusBits.push(t('[Project]')); }
+    if (connected) { statusBits.push(t('Connected')); }
+    if (dbFilter) { statusBits.push(t('Filtered')); }
+    this.description = statusBits.length ? statusBits.join(' • ') : undefined;
 
     this.tooltip = this.buildTooltip(config, connected, meta.label);
 

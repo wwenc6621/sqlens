@@ -2,7 +2,7 @@
   "name": "sqlens-vscode",
   "displayName": "Sqlens - Database Client & MCP",
   "description": "Database client with a built-in MCP server: save MySQL/PostgreSQL/SQLite/Redis/ClickHouse/Elasticsearch/MongoDB/SQL Server connections once and expose them all to any AI assistant through one aggregated MCP endpoint — register in one click, no re-entering hosts, and passwords never reach the AI (credentials stay in VS Code, only queries pass through). Search: database, db, mcp, sql, client.",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "publisher": "wwenc6621",
   "author": {
     "name": "wwenc6621",
@@ -762,37 +762,42 @@
         {
           "command": "sqlens.selectConnection",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
-          "group": "1_manage@0"
+          "group": "1_connection@0"
+        },
+        {
+          "command": "sqlens.disconnect",
+          "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
+          "group": "1_connection@1"
         },
         {
           "command": "sqlens.editConnection",
           "when": "view == sqlens.connections && viewItem =~ /^connection/",
-          "group": "1_manage@1"
+          "group": "1_connection@2"
         },
         {
           "command": "sqlens.saveConnectionToProject",
           "when": "view == sqlens.connections && (viewItem == connection-connected || viewItem == connection-disconnected)",
-          "group": "1_manage@2"
+          "group": "1_connection@3"
         },
         {
           "command": "sqlens.moveConnectionToGroup",
           "when": "view == sqlens.connections && viewItem =~ /^connection/",
-          "group": "1_manage@3"
+          "group": "1_connection@4"
         },
         {
           "command": "sqlens.refreshDatabases",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
-          "group": "2_query@5"
+          "group": "3_database@0"
         },
         {
           "command": "sqlens.newSavedQuery",
           "when": "view == sqlens.connections && viewItem =~ /^connection/",
-          "group": "2_query@0"
+          "group": "2_query@1"
         },
         {
           "command": "sqlens.clearDatabaseFilter",
           "when": "view == sqlens.connections && viewItem =~ /:filtered$/",
-          "group": "1_manage@8"
+          "group": "1_connection@5"
         },
         {
           "command": "sqlens.newSavedQuery",
@@ -822,92 +827,92 @@
         {
           "command": "sqlens.newQuery",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/",
-          "group": "2_query@1"
+          "group": "2_query@0"
         },
         {
           "command": "sqlens.erDiagram",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /:rdb$/",
-          "group": "2_query@2"
+          "group": "3_database@2"
         },
         {
           "command": "sqlens.openTerminal",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /:rdb$/",
-          "group": "2_query@3"
+          "group": "3_database@3"
         },
         {
           "command": "sqlens.createDatabase",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /:rdb$/",
-          "group": "2_query@4"
+          "group": "3_database@1"
         },
         {
           "command": "sqlens.deleteConnection",
           "when": "view == sqlens.connections && viewItem =~ /^connection/",
-          "group": "3_danger@1"
+          "group": "9_danger@1"
         },
         {
           "command": "sqlens.esCreateIndex",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /elasticsearch/",
-          "group": "1_manage@3"
+          "group": "4_data@0"
         },
         {
           "command": "sqlens.esDeleteIndex",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /elasticsearch/",
-          "group": "1_manage@4"
+          "group": "4_data@1"
         },
         {
           "command": "sqlens.esExport",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /elasticsearch/",
-          "group": "1_manage@5"
+          "group": "4_data@2"
         },
         {
           "command": "sqlens.esImport",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /elasticsearch/",
-          "group": "1_manage@6"
+          "group": "4_data@3"
         },
         {
           "command": "sqlens.mongoCreateCollection",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mongodb/",
-          "group": "1_manage@3"
+          "group": "4_data@0"
         },
         {
           "command": "sqlens.mongoCreateIndex",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mongodb/",
-          "group": "1_manage@4"
+          "group": "4_data@1"
         },
         {
           "command": "sqlens.mongoExport",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mongodb/",
-          "group": "1_manage@5"
+          "group": "4_data@2"
         },
         {
           "command": "sqlens.mongoImport",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mongodb/",
-          "group": "1_manage@6"
+          "group": "4_data@3"
         },
         {
           "command": "sqlens.mongoShell",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mongodb/",
-          "group": "1_manage@7"
+          "group": "4_data@4"
         },
         {
           "command": "sqlens.clickhouseExport",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /clickhouse/",
-          "group": "1_manage@3"
+          "group": "4_data@2"
         },
         {
           "command": "sqlens.mssqlBcpExport",
           "when": "view == sqlens.connections && viewItem =~ /connection-connected/ && viewItem =~ /mssql/",
-          "group": "1_manage@3"
+          "group": "4_data@2"
         },
         {
           "command": "sqlens.redisExport",
           "when": "view == sqlens.connections && viewItem =~ /redis/",
-          "group": "1_manage@3"
+          "group": "4_data@2"
         },
         {
           "command": "sqlens.redisImport",
           "when": "view == sqlens.connections && viewItem =~ /redis/",
-          "group": "1_manage@4"
+          "group": "4_data@3"
         },
         {
           "command": "sqlens.refreshDatabases",
